@@ -1,4 +1,5 @@
 import { ReactNode } from 'react';
+import { GeneratedContentProvider } from './GeneratedContentContext';
 import { GoalsProvider } from './GoalsContext';
 import { LectureProvider } from './LectureContext';
 import { PhraseProvider } from './PhraseContext';
@@ -11,7 +12,9 @@ export function AppProviders({ children }: { children: ReactNode }) {
       <LectureProvider>
         <PhraseProvider>
           <TalkProvider>
-            <GoalsProvider>{children}</GoalsProvider>
+            <GoalsProvider>
+              <GeneratedContentProvider>{children}</GeneratedContentProvider>
+            </GoalsProvider>
           </TalkProvider>
         </PhraseProvider>
       </LectureProvider>

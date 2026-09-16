@@ -3,15 +3,20 @@ const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
 const OpenAI = require('openai');
 const { toFile } = require('openai/uploads');
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
 
 const upload = multer({ dest: '/tmp/teppen-uploads/' });
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+const TTS_CACHE_DIR = '/tmp/teppen-tts-cache';
+fs.mkdirSync(TTS_CACHE_DIR, { recursive: true });
 
 app.get('/api/health', (req, res) => {
   res.json({ ok: true, hasKey: Boolean(process.env.OPENAI_API_KEY) });
@@ -57,6 +62,100 @@ app.post('/api/grade', upload.single('audio'), async (req, res) => {
     res.status(500).json({ error: 'grading_failed', detail: String(err.message || err) });
   } finally {
     fs.unlink(file.path, () => {});
+  }
+});
+
+// POST /api/tts/prepare { text, voice } -> { url } (キャッシュ済みでなければOpenAI TTSで生成)
+const ALLOWED_VOICES = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
+app.post('/api/tts/prepare', async (req, res) => {
+  const { text, voice = 'alloy' } = req.body || {};
+  if (!text || typeof text !== 'string') return res.status(400).json({ error: 'text is required' });
+  const safeVoice = ALLOWED_VOICES.includes(voice) ? voice : 'alloy';
+
+  const hash = crypto.createHash('sha256').update(`${safeVoice}::${text}`).digest('hex');
+  const filePath = path.join(TTS_CACHE_DIR, `${hash}.mp3`);
+
+  try {
+    if (!fs.existsSync(filePath)) {
+      const speech = await openai.audio.speech.create({
+        model: 'tts-1',
+        voice: safeVoice,
+        input: text.slice(0, 4000),
+      });
+      const buffer = Buffer.from(await speech.arrayBuffer());
+      fs.writeFileSync(filePath, buffer);
+    }
+    res.json({ url: `/api/tts/audio/${hash}.mp3` });
+  } catch (err) {
+    console.error('tts error:', err);
+    res.status(500).json({ error: 'tts_failed', detail: String(err.message || err) });
+  }
+});
+
+app.get('/api/tts/audio/:file', (req, res) => {
+  const filePath = path.join(TTS_CACHE_DIR, req.params.file);
+  if (!filePath.startsWith(TTS_CACHE_DIR) || !fs.existsSync(filePath)) {
+    return res.status(404).end();
+  }
+  res.setHeader('Content-Type', 'audio/mpeg');
+  fs.createReadStream(filePath).pipe(res);
+});
+
+// POST /api/generate/dialogue { scene, profile } -> AI生成の会話文
+app.post('/api/generate/dialogue', async (req, res) => {
+  const { scene = '', profile = {} } = req.body || {};
+  try {
+    const resp = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      response_format: { type: 'json_object' },
+      messages: [
+        {
+          role: 'system',
+          content:
+            'あなたはビジネス英語教材の作成者です。ユーザーのプロフィールに合わせて、指定されたシーンの自然な英語の会話（5往復程度）を作成してください。' +
+            'ユーザー自身の発言は from:"me"、相手の発言は from:"them" とします。' +
+            '必ず次のJSON形式のみで回答してください: {"counterpart": "相手の呼び方（例: Mike（同僚）", "lines": [{"from": "them"|"me", "text": "英語", "textJP": "日本語訳"}, ...]}',
+        },
+        {
+          role: 'user',
+          content: `シーン: ${scene}\nユーザーの職業: ${profile.job || '会社員'}\nユーザーの職位: ${profile.position || ''}\nユーザーの職業詳細: ${profile.jobDetail || ''}`,
+        },
+      ],
+    });
+    const parsed = JSON.parse(resp.choices[0].message.content);
+    res.json(parsed);
+  } catch (err) {
+    console.error('generate dialogue error:', err);
+    res.status(500).json({ error: 'generate_failed', detail: String(err.message || err) });
+  }
+});
+
+// POST /api/generate/presentation { profile, topic? } -> AI生成のプレゼン原稿（4段落）
+app.post('/api/generate/presentation', async (req, res) => {
+  const { profile = {}, topic = '' } = req.body || {};
+  try {
+    const resp = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      response_format: { type: 'json_object' },
+      messages: [
+        {
+          role: 'system',
+          content:
+            'あなたはビジネス英語教材の作成者です。ユーザーのプロフィールに合わせて、4段落構成の英語プレゼンテーション原稿を作成してください' +
+            '（挨拶と自己紹介／課題や現状の説明／提案や分析／まとめと締めの4段落）。' +
+            '必ず次のJSON形式のみで回答してください: {"topic": "テーマ（日本語）", "paragraphsEN": ["段落1","段落2","段落3","段落4"], "paragraphsJP": ["段落1和訳","段落2和訳","段落3和訳","段落4和訳"]}',
+        },
+        {
+          role: 'user',
+          content: `テーマ: ${topic || '四半期の振り返りと提案'}\nユーザーの職業: ${profile.job || '会社員'}\nユーザーの職位: ${profile.position || ''}\n性格: ${profile.personality || ''}`,
+        },
+      ],
+    });
+    const parsed = JSON.parse(resp.choices[0].message.content);
+    res.json(parsed);
+  } catch (err) {
+    console.error('generate presentation error:', err);
+    res.status(500).json({ error: 'generate_failed', detail: String(err.message || err) });
   }
 });
 

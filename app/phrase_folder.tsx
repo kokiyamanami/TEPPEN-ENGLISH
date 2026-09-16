@@ -3,13 +3,18 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { TopBar } from '../src/components/TopBar';
+import { TtsLineButton } from '../src/components/TtsLineButton';
 import { usePhrases } from '../src/store/PhraseContext';
+import { useProfile } from '../src/store/ProfileContext';
 import { colors, radius, spacing } from '../src/theme/colors';
+import { voiceForGender } from '../src/utils/ttsVoice';
 
 // screen key: phrase_folder
 export default function PhraseFolderScreen() {
   const { folderId } = useLocalSearchParams<{ folderId?: string }>();
   const { folders, phrases, toggleLearned, openRegister } = usePhrases();
+  const { profile } = useProfile();
+  const voice = voiceForGender(profile.voiceGender);
   const folder = folders.find((f) => f.id === folderId);
   const folderPhrases = phrases.filter((p) => p.folderId === folderId);
 
@@ -63,9 +68,7 @@ export default function PhraseFolderScreen() {
         <Text style={styles.en}>&quot;{current.text}&quot;</Text>
         {showJP && current.textJP ? <Text style={styles.jp}>{current.textJP}</Text> : null}
         <View style={styles.rowBtns}>
-          <Pressable style={styles.iconBtn} hitSlop={8}>
-            <Ionicons name="play" size={16} color={colors.textPrimary} />
-          </Pressable>
+          <TtsLineButton text={current.text} voice={voice} style={styles.iconBtn} size={16} />
           <Pressable style={styles.iconBtn} onPress={() => setShowJP((v) => !v)} hitSlop={8}>
             <Ionicons name={showJP ? 'eye-off-outline' : 'eye-outline'} size={16} color={colors.textPrimary} />
           </Pressable>

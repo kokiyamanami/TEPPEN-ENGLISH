@@ -1,15 +1,19 @@
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
-import { PlayerBar } from '../src/components/PlayerBar';
 import { TopBar } from '../src/components/TopBar';
+import { TtsPlayerBar } from '../src/components/TtsPlayerBar';
 import { generateWeeklyMaterial } from '../src/data/weekly';
+import { useProfile } from '../src/store/ProfileContext';
 import { colors, radius, spacing } from '../src/theme/colors';
 import { toSlashReading } from '../src/utils/slashReading';
+import { voiceForGender } from '../src/utils/ttsVoice';
 
 // screen key: weekly_material
 export default function WeeklyMaterialScreen() {
   const w = useMemo(() => generateWeeklyMaterial(), []);
+  const { profile } = useProfile();
+  const voice = voiceForGender(profile.voiceGender);
   const [langPage, setLangPage] = useState<0 | 1>(0);
   const [slashOn, setSlashOn] = useState(false);
 
@@ -47,7 +51,7 @@ export default function WeeklyMaterialScreen() {
       </View>
 
       <View style={styles.playerCard}>
-        <PlayerBar />
+        <TtsPlayerBar text={w.paragraphsEN.join(' ')} voice={voice} />
       </View>
 
       <Pressable style={styles.cta} onPress={() => router.push('/weekly_practice')}>

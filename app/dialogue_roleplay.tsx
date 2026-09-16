@@ -4,18 +4,25 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ResultView } from '../src/components/ResultView';
 import { TopBar } from '../src/components/TopBar';
-import { formatCallTime } from '../src/hooks/useRecordFlow';
+import { TtsLineButton } from '../src/components/TtsLineButton';
 import { generateDialogue } from '../src/data/situational';
+import { formatCallTime } from '../src/hooks/useRecordFlow';
+import { useGeneratedContent } from '../src/store/GeneratedContentContext';
+import { useProfile } from '../src/store/ProfileContext';
 import { colors, radius, spacing } from '../src/theme/colors';
+import { voiceForGender } from '../src/utils/ttsVoice';
 
 type LineState = { phase: 'idle' | 'recording' | 'recorded'; seconds: number };
 
 // screen key: dialogue_roleplay
 export default function DialogueRoleplayScreen() {
-  const { scene: sceneParam, variant: variantParam } = useLocalSearchParams<{ scene?: string; variant?: string }>();
+  const { scene: sceneParam } = useLocalSearchParams<{ scene?: string }>();
   const scene = sceneParam ?? '同僚との会話';
-  const variant = Number(variantParam ?? 0);
-  const dialogue = useMemo(() => generateDialogue(scene, variant), [scene, variant]);
+  const { currentDialogue } = useGeneratedContent();
+  const fallback = useMemo(() => generateDialogue(scene, 0), [scene]);
+  const dialogue = currentDialogue ?? fallback;
+  const { profile } = useProfile();
+  const voice = voiceForGender(profile.voiceGender);
 
   const [lineStates, setLineStates] = useState<Record<number, LineState>>({});
   const [done, setDone] = useState(false);
@@ -85,9 +92,7 @@ export default function DialogueRoleplayScreen() {
               <View key={i} style={styles.themCard}>
                 <Text style={styles.themLabel}>{dialogue.counterpart}</Text>
                 <Text style={styles.themText}>{line.text}</Text>
-                <Pressable style={styles.playBtn} hitSlop={8}>
-                  <Ionicons name="play" size={14} color={colors.textPrimary} />
-                </Pressable>
+                <TtsLineButton text={line.text} voice={voice} style={styles.playBtn} />
               </View>
             );
           }

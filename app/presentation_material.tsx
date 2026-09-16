@@ -1,29 +1,58 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
-import { PlayerBar } from '../src/components/PlayerBar';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { generatePresentationRemote } from '../src/api/generation';
 import { TopBar } from '../src/components/TopBar';
+import { TtsPlayerBar } from '../src/components/TtsPlayerBar';
 import { generatePresentation } from '../src/data/situational';
+import { useGeneratedContent } from '../src/store/GeneratedContentContext';
 import { usePhrases } from '../src/store/PhraseContext';
+import { useProfile } from '../src/store/ProfileContext';
 import { colors, radius, spacing } from '../src/theme/colors';
 import { toSlashReading } from '../src/utils/slashReading';
+import { voiceForGender } from '../src/utils/ttsVoice';
+
+type Presentation = { topic: string; paragraphsEN: string[]; paragraphsJP: string[] };
 
 // screen key: presentation_material
 export default function PresentationMaterialScreen() {
-  const [variant, setVariant] = useState(0);
+  const { profile } = useProfile();
+  const { openRegister } = usePhrases();
+  const { setCurrentPresentation } = useGeneratedContent();
+  const [p, setP] = useState<Presentation>(() => generatePresentation(0));
+  const [loading, setLoading] = useState(true);
   const [regenUsed, setRegenUsed] = useState(false);
   const [langPage, setLangPage] = useState<0 | 1>(0);
   const [slashOn, setSlashOn] = useState(false);
-  const { openRegister } = usePhrases();
 
-  const p = useMemo(() => generatePresentation(variant), [variant]);
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const result = await generatePresentationRemote(profile);
+      setP(result);
+      setCurrentPresentation(result);
+    } catch (e) {
+      // オフライン等の場合は静的サンプルにフォールバック
+      const fallback = generatePresentation(0);
+      setP(fallback);
+      setCurrentPresentation(fallback);
+    } finally {
+      setLoading(false);
+    }
+  }, [profile]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    load();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const enBlocks = slashOn ? p.paragraphsEN.map(toSlashReading) : p.paragraphsEN;
+  const voice = voiceForGender(profile.voiceGender);
 
   const regenerate = () => {
     if (regenUsed) return;
-    setVariant((v) => (v === 0 ? 1 : 0));
     setRegenUsed(true);
+    load();
   };
 
   return (
@@ -58,22 +87,28 @@ export default function PresentationMaterialScreen() {
         </Pressable>
       </View>
 
-      <View style={styles.paragraphCard}>
-        {(langPage === 0 ? enBlocks : p.paragraphsJP).map((t, i) => (
-          <Text key={i} style={styles.paragraphText}>
-            {t}
-          </Text>
-        ))}
-      </View>
+      {loading ? (
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator color={colors.coral} />
+          <Text style={styles.loadingText}>AIが原稿を生成しています…</Text>
+        </View>
+      ) : (
+        <>
+          <View style={styles.paragraphCard}>
+            {(langPage === 0 ? enBlocks : p.paragraphsJP).map((t, i) => (
+              <Text key={i} style={styles.paragraphText}>
+                {t}
+              </Text>
+            ))}
+          </View>
 
-      <View style={styles.playerCard}>
-        <PlayerBar />
-      </View>
+          <View style={styles.playerCard}>
+            <TtsPlayerBar text={p.paragraphsEN.join(' ')} voice={voice} />
+          </View>
+        </>
+      )}
 
-      <Pressable
-        style={styles.phraseBtn}
-        onPress={() => openRegister('', true)}
-      >
+      <Pressable style={styles.phraseBtn} onPress={() => openRegister('', true)}>
         <Ionicons name="bookmark-outline" size={14} color={colors.coral} />
         <Text style={styles.phraseBtnText}>気になった表現をMYフレーズに登録する</Text>
       </Pressable>
@@ -103,6 +138,8 @@ const styles = StyleSheet.create({
   langTabSel: { backgroundColor: colors.navy, borderColor: colors.navy },
   langTabText: { fontSize: 11, color: colors.textSecondary },
   langTabTextSel: { color: colors.white },
+  loadingWrap: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xl },
+  loadingText: { fontSize: 12, color: colors.textSecondary },
   paragraphCard: { margin: spacing.lg, backgroundColor: colors.white, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: spacing.md, gap: spacing.sm },
   paragraphText: { fontSize: 12.5, color: colors.textPrimary, lineHeight: 19 },
   playerCard: { marginHorizontal: spacing.lg, marginBottom: spacing.md, backgroundColor: colors.white, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: spacing.md },

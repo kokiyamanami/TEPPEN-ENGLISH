@@ -1,26 +1,54 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { PlayerBar } from '../src/components/PlayerBar';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { generateDialogueRemote } from '../src/api/generation';
 import { TopBar } from '../src/components/TopBar';
-import { generateDialogue } from '../src/data/situational';
+import { TtsLineButton } from '../src/components/TtsLineButton';
+import { TtsPlayerBar } from '../src/components/TtsPlayerBar';
+import { generateDialogue, Dialogue } from '../src/data/situational';
+import { useGeneratedContent } from '../src/store/GeneratedContentContext';
 import { usePhrases } from '../src/store/PhraseContext';
+import { useProfile } from '../src/store/ProfileContext';
 import { colors, radius, spacing } from '../src/theme/colors';
 import { toSlashReading } from '../src/utils/slashReading';
+import { voiceForGender } from '../src/utils/ttsVoice';
 
 // screen key: situational_dialogue
 export default function SituationalDialogueScreen() {
   const { scene: sceneParam } = useLocalSearchParams<{ scene?: string }>();
   const scene = sceneParam ?? '同僚との会話';
 
-  const [variant, setVariant] = useState(0);
   const [regenUsed, setRegenUsed] = useState(false);
   const [langPage, setLangPage] = useState<0 | 1>(0);
   const [slashLines, setSlashLines] = useState<Set<number>>(new Set());
+  const [loading, setLoading] = useState(true);
+  const [dialogue, setDialogue] = useState<Dialogue>(() => generateDialogue(scene, 0));
 
-  const dialogue = useMemo(() => generateDialogue(scene, variant), [scene, variant]);
   const { openRegister } = usePhrases();
+  const { profile } = useProfile();
+  const { setCurrentDialogue } = useGeneratedContent();
+  const voice = voiceForGender(profile.voiceGender);
+  const fullText = useMemo(() => dialogue.lines.map((l) => l.text).join(' '), [dialogue]);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const result = await generateDialogueRemote(scene, profile);
+      setDialogue(result);
+      setCurrentDialogue(result);
+    } catch (e) {
+      const fallback = generateDialogue(scene, Math.random() > 0.5 ? 1 : 0);
+      setDialogue(fallback);
+      setCurrentDialogue(fallback);
+    } finally {
+      setLoading(false);
+    }
+  }, [scene, profile]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    load();
+  }, [scene]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleSlash = (i: number) => {
     setSlashLines((prev) => {
@@ -33,8 +61,8 @@ export default function SituationalDialogueScreen() {
 
   const regenerate = () => {
     if (regenUsed) return;
-    setVariant((v) => (v === 0 ? 1 : 0));
     setRegenUsed(true);
+    load();
   };
 
   const registerPhrase = (text: string) => {
@@ -68,40 +96,47 @@ export default function SituationalDialogueScreen() {
         </Pressable>
       </View>
 
-      <View style={styles.lines}>
-        {dialogue.lines.map((line, i) => {
-          const isMe = line.from === 'me';
-          const slashed = slashLines.has(i);
-          return (
-            <View key={i} style={[styles.lineRow, isMe && styles.lineRowMe]}>
-              <View style={[styles.bubble, isMe && styles.bubbleMe]}>
-                <Text style={[styles.bubbleText, isMe && styles.bubbleTextMe]}>
-                  {langPage === 0 ? (slashed ? toSlashReading(line.text) : line.text) : line.textJP}
-                </Text>
-              </View>
-              {langPage === 0 && (
-                <View style={[styles.lineToolbar, isMe && styles.lineToolbarMe]}>
-                  <Pressable style={styles.lineBtn} hitSlop={8}>
-                    <Ionicons name="play" size={13} color={colors.textPrimary} />
-                  </Pressable>
-                  <Pressable style={[styles.lineBtn, slashed && styles.lineBtnActive]} onPress={() => toggleSlash(i)} hitSlop={8}>
-                    <Text style={[styles.slashIcon, slashed && styles.slashIconActive]}>/</Text>
-                  </Pressable>
-                  <Pressable style={styles.lineBtn} onPress={() => registerPhrase(line.text)} hitSlop={8}>
-                    <Ionicons name="bookmark-outline" size={13} color={colors.textPrimary} />
-                  </Pressable>
+      {loading ? (
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator color={colors.coral} />
+          <Text style={styles.loadingText}>AIが会話文を生成しています…</Text>
+        </View>
+      ) : (
+        <>
+          <View style={styles.lines}>
+            {dialogue.lines.map((line, i) => {
+              const isMe = line.from === 'me';
+              const slashed = slashLines.has(i);
+              return (
+                <View key={i} style={[styles.lineRow, isMe && styles.lineRowMe]}>
+                  <View style={[styles.bubble, isMe && styles.bubbleMe]}>
+                    <Text style={[styles.bubbleText, isMe && styles.bubbleTextMe]}>
+                      {langPage === 0 ? (slashed ? toSlashReading(line.text) : line.text) : line.textJP}
+                    </Text>
+                  </View>
+                  {langPage === 0 && (
+                    <View style={[styles.lineToolbar, isMe && styles.lineToolbarMe]}>
+                      <TtsLineButton text={line.text} voice={voice} style={styles.lineBtn} />
+                      <Pressable style={[styles.lineBtn, slashed && styles.lineBtnActive]} onPress={() => toggleSlash(i)} hitSlop={8}>
+                        <Text style={[styles.slashIcon, slashed && styles.slashIconActive]}>/</Text>
+                      </Pressable>
+                      <Pressable style={styles.lineBtn} onPress={() => registerPhrase(line.text)} hitSlop={8}>
+                        <Ionicons name="bookmark-outline" size={13} color={colors.textPrimary} />
+                      </Pressable>
+                    </View>
+                  )}
                 </View>
-              )}
-            </View>
-          );
-        })}
-      </View>
+              );
+            })}
+          </View>
 
-      <View style={styles.playerCard}>
-        <PlayerBar />
-      </View>
+          <View style={styles.playerCard}>
+            <TtsPlayerBar text={fullText} voice={voice} />
+          </View>
+        </>
+      )}
 
-      <Pressable style={styles.cta} onPress={() => router.push({ pathname: '/dialogue_roleplay', params: { scene, variant: String(variant) } } as never)}>
+      <Pressable style={styles.cta} onPress={() => router.push({ pathname: '/dialogue_roleplay', params: { scene } } as never)}>
         <Text style={styles.ctaText}>この内容でロールプレイ練習をする</Text>
       </Pressable>
     </ScrollView>
@@ -124,6 +159,8 @@ const styles = StyleSheet.create({
   langTabSel: { backgroundColor: colors.navy, borderColor: colors.navy },
   langTabText: { fontSize: 11, color: colors.textSecondary },
   langTabTextSel: { color: colors.white },
+  loadingWrap: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xl },
+  loadingText: { fontSize: 12, color: colors.textSecondary },
   lines: { paddingHorizontal: spacing.lg, marginTop: spacing.md, gap: spacing.sm },
   lineRow: { alignItems: 'flex-start' },
   lineRowMe: { alignItems: 'flex-end' },

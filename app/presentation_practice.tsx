@@ -7,11 +7,14 @@ import { ResultView } from '../src/components/ResultView';
 import { TopBar } from '../src/components/TopBar';
 import { generatePresentation } from '../src/data/situational';
 import { useAudioRecordFlow } from '../src/hooks/useAudioRecordFlow';
+import { useGeneratedContent } from '../src/store/GeneratedContentContext';
 import { colors, radius, spacing } from '../src/theme/colors';
 
 // screen key: presentation_practice
 export default function PresentationPracticeScreen() {
-  const p = useMemo(() => generatePresentation(0), []);
+  const { currentPresentation } = useGeneratedContent();
+  const fallback = useMemo(() => generatePresentation(0), []);
+  const p = currentPresentation ?? fallback;
   const record = useAudioRecordFlow();
   const [grading, setGrading] = useState(false);
   const [result, setResult] = useState<{ pass: boolean; comment: string; transcript: string } | null>(null);
