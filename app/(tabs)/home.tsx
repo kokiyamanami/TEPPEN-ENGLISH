@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { RidgeMini } from '../../src/components/RidgeMini';
 import { ScreenHeader } from '../../src/components/ScreenHeader';
 import {
   MOCK_TOTAL_STUDY_MINUTES,
@@ -27,6 +28,9 @@ export default function HomeScreen() {
       <ScreenHeader title="トレーニング" subtitle="今日も一歩、頂上に近づこう" />
 
       <Pressable style={styles.altitudeCard} onPress={() => router.push('/ascent_climb')}>
+        <View style={styles.ridgeBg} pointerEvents="none">
+          <RidgeMini />
+        </View>
         <Text style={styles.altitudeLabel}>現在の標高</Text>
         <Text style={styles.altitudeValue}>{altitudeM}M</Text>
         {next ? (
@@ -58,7 +62,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.navy,
     borderRadius: radius.lg,
     padding: spacing.lg,
+    overflow: 'hidden',
   },
+  ridgeBg: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '70%' },
   altitudeLabel: { color: colors.coralLight, fontSize: 12 },
   altitudeValue: { color: colors.white, fontSize: 36, fontWeight: '700', marginTop: spacing.xs },
   altitudeNext: { color: colors.white, fontSize: 12, marginTop: spacing.sm, opacity: 0.85 },
