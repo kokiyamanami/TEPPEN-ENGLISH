@@ -1,26 +1,32 @@
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { submitForGrading } from '../src/api/grading';
 import { RecordCard } from '../src/components/RecordCard';
 import { ResultView } from '../src/components/ResultView';
 import { TopBar } from '../src/components/TopBar';
-import { generateWeeklyMaterial, randomWeeklyFeedback } from '../src/data/weekly';
-import { useRecordFlow } from '../src/hooks/useRecordFlow';
+import { generateWeeklyMaterial } from '../src/data/weekly';
+import { useAudioRecordFlow } from '../src/hooks/useAudioRecordFlow';
 import { colors, radius, spacing } from '../src/theme/colors';
 
 // screen key: weekly_practice
 export default function WeeklyPracticeScreen() {
   const w = useMemo(() => generateWeeklyMaterial(), []);
-  const record = useRecordFlow();
+  const record = useAudioRecordFlow();
   const [grading, setGrading] = useState(false);
-  const [result, setResult] = useState<{ pass: boolean; comment: string } | null>(null);
+  const [result, setResult] = useState<{ pass: boolean; comment: string; transcript: string } | null>(null);
 
-  const submit = () => {
+  const submit = async () => {
+    if (!record.uri) return;
     setGrading(true);
-    setTimeout(() => {
+    try {
+      const res = await submitForGrading(record.uri, `Weeklyミッション: ${w.topic}`, w.paragraphsEN.join(' '), w.paragraphsJP.join(' '));
+      setResult(res);
+    } catch (e) {
+      Alert.alert('添削に失敗しました', 'サーバーに接続できませんでした。もう一度お試しください。');
+    } finally {
       setGrading(false);
-      setResult(randomWeeklyFeedback());
-    }, 1400);
+    }
   };
 
   if (result) {
@@ -43,6 +49,10 @@ export default function WeeklyPracticeScreen() {
             <Text style={styles.feedbackLabel}>添削コメント</Text>
             <Text style={styles.feedbackText}>{result.comment}</Text>
           </View>
+          <View style={styles.feedbackCard}>
+            <Text style={styles.feedbackLabel}>あなたの発話（文字起こし）</Text>
+            <Text style={styles.feedbackText}>{result.transcript || '(認識できませんでした)'}</Text>
+          </View>
         </ResultView>
       </ScrollView>
     );
@@ -59,6 +69,7 @@ export default function WeeklyPracticeScreen() {
       <RecordCard
         phase={grading ? 'grading' : record.phase}
         seconds={record.seconds}
+        uri={record.uri}
         onStart={record.start}
         onStop={record.stop}
         onRetake={record.retake}

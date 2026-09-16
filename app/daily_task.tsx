@@ -1,12 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { submitForGrading } from '../src/api/grading';
 import { RecordCard } from '../src/components/RecordCard';
 import { ResultView } from '../src/components/ResultView';
 import { TopBar } from '../src/components/TopBar';
-import { DAILY_MISSIONS, DailyMissionType, randomFeedback } from '../src/data/dailyMissions';
-import { useRecordFlow } from '../src/hooks/useRecordFlow';
+import { DAILY_MISSIONS, DailyMissionType } from '../src/data/dailyMissions';
+import { useAudioRecordFlow } from '../src/hooks/useAudioRecordFlow';
 import { colors, radius, spacing } from '../src/theme/colors';
 
 type Phase = 'idle' | 'recording' | 'recorded' | 'grading';
@@ -19,16 +20,21 @@ export default function DailyTaskScreen() {
   const backRoute = origin === 'freetraining' ? '/freetraining' : '/speaking_hub';
   const backLabel = origin === 'freetraining' ? 'フリー練習' : 'Dailyミッション';
 
-  const record = useRecordFlow();
+  const record = useAudioRecordFlow();
   const [grading, setGrading] = useState(false);
-  const [result, setResult] = useState<{ pass: boolean; comment: string } | null>(null);
+  const [result, setResult] = useState<{ pass: boolean; comment: string; transcript: string } | null>(null);
 
-  const submit = () => {
+  const submit = async () => {
+    if (!record.uri) return;
     setGrading(true);
-    setTimeout(() => {
+    try {
+      const res = await submitForGrading(record.uri, mission.label, mission.prompt, mission.promptJP);
+      setResult(res);
+    } catch (e) {
+      Alert.alert('添削に失敗しました', 'サーバーに接続できませんでした。もう一度お試しください。');
+    } finally {
       setGrading(false);
-      setResult(randomFeedback());
-    }, 1400);
+    }
   };
 
   const phase: Phase = grading ? 'grading' : record.phase;
@@ -52,6 +58,10 @@ export default function DailyTaskScreen() {
           <View style={styles.feedbackCard}>
             <Text style={styles.feedbackLabel}>添削コメント</Text>
             <Text style={styles.feedbackText}>{result.comment}</Text>
+          </View>
+          <View style={styles.feedbackCard}>
+            <Text style={styles.feedbackLabel}>あなたの発話（文字起こし）</Text>
+            <Text style={styles.feedbackText}>{result.transcript || '(認識できませんでした)'}</Text>
           </View>
           <Text style={styles.sampleTitle}>見本の解答例</Text>
           <View style={styles.feedbackCard}>
@@ -84,6 +94,7 @@ export default function DailyTaskScreen() {
       <RecordCard
         phase={phase}
         seconds={record.seconds}
+        uri={record.uri}
         onStart={record.start}
         onStop={record.stop}
         onRetake={record.retake}

@@ -3,10 +3,12 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { formatCallTime, RecordPhase } from '../hooks/useRecordFlow';
 import { colors, radius, spacing } from '../theme/colors';
 import { PlayerBar } from './PlayerBar';
+import { RecordingPlayback } from './RecordingPlayback';
 
 type Props = {
   phase: RecordPhase | 'grading';
   seconds: number;
+  uri?: string | null;
   onStart: () => void;
   onStop: () => void;
   onRetake: () => void;
@@ -15,7 +17,7 @@ type Props = {
   idleLabel?: string;
 };
 
-export function RecordCard({ phase, seconds, onStart, onStop, onRetake, onSubmit, submitLabel, idleLabel }: Props) {
+export function RecordCard({ phase, seconds, uri, onStart, onStop, onRetake, onSubmit, submitLabel, idleLabel }: Props) {
   return (
     <View style={styles.card}>
       {phase === 'idle' && (
@@ -52,9 +54,7 @@ export function RecordCard({ phase, seconds, onStart, onStop, onRetake, onSubmit
             <Ionicons name="checkmark-circle" size={16} color={colors.success} />
             <Text style={styles.doneBadgeText}>録音しました（{formatCallTime(seconds)}）</Text>
           </View>
-          <View style={styles.playerWrap}>
-            <PlayerBar />
-          </View>
+          <View style={styles.playerWrap}>{uri ? <RecordingPlayback uri={uri} /> : <PlayerBar />}</View>
           <View style={styles.secondRow}>
             <Pressable style={styles.smallBtn} onPress={onRetake}>
               <Ionicons name="mic-outline" size={14} color={colors.textPrimary} />

@@ -1,35 +1,59 @@
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { submitForGrading } from '../src/api/grading';
 import { RecordCard } from '../src/components/RecordCard';
 import { ResultView } from '../src/components/ResultView';
 import { TopBar } from '../src/components/TopBar';
 import { generatePresentation } from '../src/data/situational';
-import { useRecordFlow } from '../src/hooks/useRecordFlow';
+import { useAudioRecordFlow } from '../src/hooks/useAudioRecordFlow';
 import { colors, radius, spacing } from '../src/theme/colors';
 
 // screen key: presentation_practice
 export default function PresentationPracticeScreen() {
   const p = useMemo(() => generatePresentation(0), []);
-  const record = useRecordFlow();
-  const [done, setDone] = useState(false);
+  const record = useAudioRecordFlow();
+  const [grading, setGrading] = useState(false);
+  const [result, setResult] = useState<{ pass: boolean; comment: string; transcript: string } | null>(null);
 
-  if (done) {
+  const submit = async () => {
+    if (!record.uri) return;
+    setGrading(true);
+    try {
+      const res = await submitForGrading(record.uri, `プレゼンテーション: ${p.topic}`, p.paragraphsEN.join(' '), p.paragraphsJP.join(' '));
+      setResult(res);
+    } catch (e) {
+      Alert.alert('添削に失敗しました', 'サーバーに接続できませんでした。もう一度お試しください。');
+    } finally {
+      setGrading(false);
+    }
+  };
+
+  if (result) {
     return (
       <ScrollView style={styles.screen}>
         <TopBar title="プレゼン練習" backRoute="/presentation_material" />
         <ResultView
-          pass
-          title="練習お疲れさまでした！"
-          subtitle={`「${p.topic}」のプレゼンを練習しました。\n気になった表現はMYフレーズに残しておきましょう。`}
+          pass={result.pass}
+          title={result.pass ? '合格です！' : '不合格でした'}
+          subtitle={`「${p.topic}」のプレゼンをAIが添削しました。`}
           primaryLabel="もう一度練習する"
           onPrimary={() => {
             record.reset();
-            setDone(false);
+            setResult(null);
           }}
           secondaryLabel="教材に戻る"
           onSecondary={() => router.replace('/presentation_material')}
-        />
+        >
+          <View style={styles.feedbackCard}>
+            <Text style={styles.feedbackLabel}>添削コメント</Text>
+            <Text style={styles.feedbackText}>{result.comment}</Text>
+          </View>
+          <View style={styles.feedbackCard}>
+            <Text style={styles.feedbackLabel}>あなたの発話（文字起こし）</Text>
+            <Text style={styles.feedbackText}>{result.transcript || '(認識できませんでした)'}</Text>
+          </View>
+        </ResultView>
       </ScrollView>
     );
   }
@@ -43,13 +67,14 @@ export default function PresentationPracticeScreen() {
       </View>
 
       <RecordCard
-        phase={record.phase}
+        phase={grading ? 'grading' : record.phase}
         seconds={record.seconds}
+        uri={record.uri}
         onStart={record.start}
         onStop={record.stop}
         onRetake={record.retake}
-        onSubmit={() => setDone(true)}
-        submitLabel="練習を終える"
+        onSubmit={submit}
+        submitLabel="提出してAI添削を受ける"
         idleLabel="通しで録音してみましょう"
       />
     </ScrollView>
@@ -61,4 +86,7 @@ const styles = StyleSheet.create({
   scriptCard: { margin: spacing.lg, marginBottom: 0, backgroundColor: colors.white, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: spacing.md },
   scriptTitle: { fontSize: 13, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.xs },
   scriptText: { fontSize: 12.5, color: colors.textSecondary, lineHeight: 19 },
+  feedbackCard: { width: '100%', backgroundColor: colors.background, borderRadius: radius.md, padding: spacing.md, marginTop: spacing.md },
+  feedbackLabel: { fontSize: 11, color: colors.textSecondary, marginBottom: spacing.xs },
+  feedbackText: { fontSize: 13, color: colors.textPrimary, lineHeight: 19 },
 });

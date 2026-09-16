@@ -1,27 +1,37 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { submitForGrading } from '../src/api/grading';
 import { RecordCard } from '../src/components/RecordCard';
 import { ResultView } from '../src/components/ResultView';
 import { TopBar } from '../src/components/TopBar';
-import { randomFeedback } from '../src/data/dailyMissions';
-import { useRecordFlow } from '../src/hooks/useRecordFlow';
+import { useAudioRecordFlow } from '../src/hooks/useAudioRecordFlow';
 import { colors, radius, spacing } from '../src/theme/colors';
 
 // screen key: mission (Monthlyミッション「MYピッチ」)
 // TODO(Phase10): メモ内容の永続化（現状はローカル状態のみ）
 export default function MissionScreen() {
-  const record = useRecordFlow();
+  const record = useAudioRecordFlow();
   const [memo, setMemo] = useState('');
   const [grading, setGrading] = useState(false);
-  const [result, setResult] = useState<{ pass: boolean; comment: string } | null>(null);
+  const [result, setResult] = useState<{ pass: boolean; comment: string; transcript: string } | null>(null);
 
-  const submit = () => {
+  const submit = async () => {
+    if (!record.uri) return;
     setGrading(true);
-    setTimeout(() => {
+    try {
+      const res = await submitForGrading(
+        record.uri,
+        'Monthlyミッション: MYピッチ',
+        memo.trim() || '(自由スピーチ。特定の原稿指定なし。内容の一貫性・具体性・発話量を評価してください)',
+        ''
+      );
+      setResult(res);
+    } catch (e) {
+      Alert.alert('添削に失敗しました', 'サーバーに接続できませんでした。もう一度お試しください。');
+    } finally {
       setGrading(false);
-      setResult(randomFeedback());
-    }, 1400);
+    }
   };
 
   if (result) {
@@ -44,6 +54,10 @@ export default function MissionScreen() {
             <Text style={styles.feedbackLabel}>添削コメント</Text>
             <Text style={styles.feedbackText}>{result.comment}</Text>
           </View>
+          <View style={styles.feedbackCard}>
+            <Text style={styles.feedbackLabel}>あなたの発話（文字起こし）</Text>
+            <Text style={styles.feedbackText}>{result.transcript || '(認識できませんでした)'}</Text>
+          </View>
         </ResultView>
       </ScrollView>
     );
@@ -62,6 +76,7 @@ export default function MissionScreen() {
       <RecordCard
         phase={grading ? 'grading' : record.phase}
         seconds={record.seconds}
+        uri={record.uri}
         onStart={record.start}
         onStop={record.stop}
         onRetake={record.retake}

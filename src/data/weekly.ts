@@ -20,12 +20,3 @@ export function generateWeeklyMaterial(): WeeklyMaterial {
   };
 }
 
-export const WEEKLY_FEEDBACK_POOL = [
-  { pass: true, comment: '内容の構成が明確で、強み・弱み・将来像がバランス良く伝わりました。' },
-  { pass: true, comment: '話す速度がちょうど良く、聞き取りやすい発話でした。次はもう少し抑揚をつけてみましょう。' },
-  { pass: false, comment: '内容は伝わりましたが、途中で言葉に詰まる箇所がありました。原稿をもう少し音読してから挑戦してみましょう。' },
-];
-
-export function randomWeeklyFeedback() {
-  return WEEKLY_FEEDBACK_POOL[Math.floor(Math.random() * WEEKLY_FEEDBACK_POOL.length)];
-}

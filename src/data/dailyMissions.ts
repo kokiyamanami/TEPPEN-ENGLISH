@@ -29,13 +29,3 @@ export const DAILY_MISSIONS: Record<DailyMissionType, DailyMission> = {
   },
 };
 
-// TODO(Phase10): STT+LLMによる実添削に置き換え。現状は固定コメントからランダム表示
-export const AI_FEEDBACK_POOL = [
-  { pass: true, comment: '文法・語彙ともに正確で、内容も具体的に伝わりました。' },
-  { pass: true, comment: '話す速度がちょうど良く、聞き取りやすい発話でした。' },
-  { pass: false, comment: '内容は伝わりましたが、途中で言葉に詰まる箇所がありました。もう一度挑戦してみましょう。' },
-];
-
-export function randomFeedback() {
-  return AI_FEEDBACK_POOL[Math.floor(Math.random() * AI_FEEDBACK_POOL.length)];
-}

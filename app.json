@@ -9,7 +9,13 @@
     "userInterfaceStyle": "light",
     "plugins": [
       "expo-router",
-      "expo-video"
+      "expo-video",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "録音して発話練習の内容をAIに添削してもらうためにマイクを使用します。"
+        }
+      ]
     ],
     "ios": {
       "supportsTablet": true
