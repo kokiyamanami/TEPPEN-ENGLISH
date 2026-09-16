@@ -3,15 +3,24 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors, radius, spacing } from '../src/theme/colors';
 
 // screen key: splash
-// Phase 1 will replace the CTA below with the real auth -> onboarding flow.
 export default function SplashScreen() {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>BASE CAMP{'\n'}English</Text>
-      <Text style={styles.subtitle}>毎日の一言が、頂上への一歩になる。</Text>
-      <Pressable style={styles.cta} onPress={() => router.replace('/(tabs)/home')}>
-        <Text style={styles.ctaText}>はじめる</Text>
-      </Pressable>
+      <Text style={styles.mark}>⛰️</Text>
+      <Text style={styles.title}>コーチング型 英語学習</Text>
+      <Text style={styles.subtitle}>
+        プロフィールに合わせてAIが教材を作る、{'\n'}登頂型の英語トレーニング。
+      </Text>
+      <View style={styles.ctaGroup}>
+        <Pressable style={styles.cta} onPress={() => router.push('/auth?tab=signup')}>
+          <Text style={styles.ctaText}>はじめる</Text>
+        </Pressable>
+        <Pressable onPress={() => router.push('/auth?tab=login')}>
+          <Text style={styles.ghostText}>
+            すでにアカウントをお持ちの方は<Text style={styles.ghostBold}>ログイン</Text>
+          </Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -24,28 +33,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: spacing.lg,
   },
-  title: {
-    color: colors.white,
-    fontSize: 32,
-    fontWeight: '700',
-    textAlign: 'center',
-    lineHeight: 40,
-  },
+  mark: { fontSize: 48 },
+  title: { color: colors.white, fontSize: 19, fontWeight: '700', marginTop: spacing.lg },
   subtitle: {
     color: colors.coralLight,
-    fontSize: 14,
-    marginTop: spacing.md,
-    marginBottom: spacing.xl,
+    fontSize: 13,
+    marginTop: spacing.sm,
+    textAlign: 'center',
+    lineHeight: 20,
   },
+  ctaGroup: { width: '100%', marginTop: spacing.xl, gap: spacing.md },
   cta: {
     backgroundColor: colors.coral,
     paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xl,
     borderRadius: radius.pill,
+    alignItems: 'center',
   },
-  ctaText: {
-    color: colors.white,
-    fontSize: 16,
-    fontWeight: '600',
-  },
+  ctaText: { color: colors.white, fontSize: 16, fontWeight: '700' },
+  ghostText: { color: colors.white, fontSize: 12, textAlign: 'center', opacity: 0.85 },
+  ghostBold: { fontWeight: '700' },
 });
