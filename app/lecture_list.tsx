@@ -1,5 +1,73 @@
-import { ComingSoon } from '../src/components/ComingSoon';
+import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { TopBar } from '../src/components/TopBar';
+import { LECTURES } from '../src/data/lectures';
+import { useLectures } from '../src/store/LectureContext';
+import { colors, radius, spacing } from '../src/theme/colors';
 
+// screen key: lecture_list
 export default function LectureListScreen() {
-  return <ComingSoon title="動画講座" phase="Phase 3" />;
+  const { watchedIds } = useLectures();
+
+  return (
+    <ScrollView style={styles.screen}>
+      <TopBar title="動画" backRoute="/(tabs)/home" />
+      <View style={styles.card}>
+        {LECTURES.map((l, i) => {
+          const watched = watchedIds.has(l.id);
+          return (
+            <Pressable
+              key={l.id}
+              style={[styles.row, i > 0 && styles.rowBordered]}
+              onPress={() => router.push({ pathname: '/lecture_player', params: { id: l.id } } as never)}
+            >
+              <View style={[styles.thumb, { backgroundColor: l.color }]}>
+                <Ionicons name="play-circle-outline" size={22} color={colors.white} />
+                {watched && (
+                  <View style={styles.watchedBadge}>
+                    <Ionicons name="checkmark" size={10} color={colors.white} />
+                  </View>
+                )}
+              </View>
+              <View style={styles.body}>
+                <Text style={styles.title} numberOfLines={2}>
+                  {l.title}
+                </Text>
+                <Text style={styles.sub}>
+                  {l.instructor}・{l.duration}
+                </Text>
+              </View>
+              <Text style={styles.tag}>{l.category}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </ScrollView>
+  );
 }
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: colors.background },
+  card: { margin: spacing.lg, backgroundColor: colors.white, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border },
+  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md },
+  rowBordered: { borderTopWidth: 1, borderTopColor: colors.border },
+  thumb: { width: 56, height: 56, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
+  watchedBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: colors.success,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.white,
+  },
+  body: { flex: 1 },
+  title: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
+  sub: { fontSize: 11, color: colors.textSecondary, marginTop: 2 },
+  tag: { fontSize: 10, color: colors.textSecondary, backgroundColor: colors.background, paddingHorizontal: spacing.xs, paddingVertical: 2, borderRadius: radius.sm, overflow: 'hidden' },
+});
