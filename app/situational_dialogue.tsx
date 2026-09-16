@@ -1,10 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { PlayerBar } from '../src/components/PlayerBar';
 import { TopBar } from '../src/components/TopBar';
 import { generateDialogue } from '../src/data/situational';
+import { usePhrases } from '../src/store/PhraseContext';
 import { colors, radius, spacing } from '../src/theme/colors';
 import { toSlashReading } from '../src/utils/slashReading';
 
@@ -19,6 +20,7 @@ export default function SituationalDialogueScreen() {
   const [slashLines, setSlashLines] = useState<Set<number>>(new Set());
 
   const dialogue = useMemo(() => generateDialogue(scene, variant), [scene, variant]);
+  const { openRegister } = usePhrases();
 
   const toggleSlash = (i: number) => {
     setSlashLines((prev) => {
@@ -35,8 +37,8 @@ export default function SituationalDialogueScreen() {
     setRegenUsed(true);
   };
 
-  const registerPhrase = () => {
-    Alert.alert('MYフレーズ', 'フレーズ登録機能はPhase5で実装予定です。');
+  const registerPhrase = (text: string) => {
+    openRegister(text, false);
   };
 
   return (
@@ -85,7 +87,7 @@ export default function SituationalDialogueScreen() {
                   <Pressable style={[styles.lineBtn, slashed && styles.lineBtnActive]} onPress={() => toggleSlash(i)} hitSlop={8}>
                     <Text style={[styles.slashIcon, slashed && styles.slashIconActive]}>/</Text>
                   </Pressable>
-                  <Pressable style={styles.lineBtn} onPress={registerPhrase} hitSlop={8}>
+                  <Pressable style={styles.lineBtn} onPress={() => registerPhrase(line.text)} hitSlop={8}>
                     <Ionicons name="bookmark-outline" size={13} color={colors.textPrimary} />
                   </Pressable>
                 </View>

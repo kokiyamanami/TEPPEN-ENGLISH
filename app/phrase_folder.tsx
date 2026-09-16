@@ -1,0 +1,111 @@
+import { Ionicons } from '@expo/vector-icons';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { TopBar } from '../src/components/TopBar';
+import { usePhrases } from '../src/store/PhraseContext';
+import { colors, radius, spacing } from '../src/theme/colors';
+
+// screen key: phrase_folder
+export default function PhraseFolderScreen() {
+  const { folderId } = useLocalSearchParams<{ folderId?: string }>();
+  const { folders, phrases, toggleLearned, openRegister } = usePhrases();
+  const folder = folders.find((f) => f.id === folderId);
+  const folderPhrases = phrases.filter((p) => p.folderId === folderId);
+
+  const [index, setIndex] = useState(0);
+  const [showJP, setShowJP] = useState(false);
+
+  if (!folder) {
+    return (
+      <View style={styles.screen}>
+        <TopBar title="MYフレーズ" backRoute="/phrase" />
+        <Text style={styles.empty}>フォルダが見つかりません</Text>
+      </View>
+    );
+  }
+
+  if (folderPhrases.length === 0) {
+    return (
+      <View style={styles.screen}>
+        <TopBar title={folder.name} backRoute="/phrase" />
+        <Text style={styles.empty}>まだフレーズがありません</Text>
+        <Pressable style={styles.addBtn} onPress={() => openRegister('', true, folder.id)}>
+          <Ionicons name="add" size={14} color={colors.coral} />
+          <Text style={styles.addBtnText}>このカテゴリにフレーズを追加</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  const current = folderPhrases[Math.min(index, folderPhrases.length - 1)];
+
+  const next = () => {
+    setShowJP(false);
+    setIndex((i) => (i + 1) % folderPhrases.length);
+  };
+
+  return (
+    <View style={styles.screen}>
+      <TopBar title={folder.name} backRoute="/phrase" />
+
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>{folder.name}</Text>
+        <Pressable onPress={() => router.push({ pathname: '/quiz', params: { folderId: folder.id } } as never)}>
+          <Text style={styles.link}>クイズにする</Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.flashCard}>
+        <Text style={styles.progress}>
+          {index + 1} / {folderPhrases.length}
+        </Text>
+        <Text style={styles.en}>&quot;{current.text}&quot;</Text>
+        {showJP && current.textJP ? <Text style={styles.jp}>{current.textJP}</Text> : null}
+        <View style={styles.rowBtns}>
+          <Pressable style={styles.iconBtn} hitSlop={8}>
+            <Ionicons name="play" size={16} color={colors.textPrimary} />
+          </Pressable>
+          <Pressable style={styles.iconBtn} onPress={() => setShowJP((v) => !v)} hitSlop={8}>
+            <Ionicons name={showJP ? 'eye-off-outline' : 'eye-outline'} size={16} color={colors.textPrimary} />
+          </Pressable>
+        </View>
+      </View>
+
+      <Pressable
+        style={[styles.learnedBtn, current.learned && styles.learnedBtnDone]}
+        onPress={() => {
+          toggleLearned(current.id);
+          next();
+        }}
+      >
+        <Text style={[styles.learnedText, current.learned && styles.learnedTextDone]}>覚えた ✓</Text>
+      </Pressable>
+
+      <Pressable style={styles.addBtn} onPress={() => openRegister('', true, folder.id)}>
+        <Ionicons name="add" size={14} color={colors.coral} />
+        <Text style={styles.addBtnText}>このカテゴリにフレーズを追加</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: colors.background },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginHorizontal: spacing.lg, marginTop: spacing.lg },
+  sectionTitle: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+  link: { color: colors.coral, fontSize: 12, fontWeight: '600' },
+  flashCard: { margin: spacing.lg, backgroundColor: colors.white, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.xl, alignItems: 'center', minHeight: 160, justifyContent: 'center' },
+  progress: { position: 'absolute', top: spacing.md, left: spacing.md, fontSize: 11, color: colors.textSecondary },
+  en: { fontSize: 16, fontWeight: '600', color: colors.textPrimary, textAlign: 'center' },
+  jp: { fontSize: 13, color: colors.textSecondary, marginTop: spacing.md, textAlign: 'center' },
+  rowBtns: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg },
+  iconBtn: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+  learnedBtn: { marginHorizontal: spacing.lg, backgroundColor: colors.navy, borderRadius: radius.pill, paddingVertical: spacing.md, alignItems: 'center' },
+  learnedBtnDone: { backgroundColor: colors.success },
+  learnedText: { color: colors.white, fontWeight: '700' },
+  learnedTextDone: { color: colors.white },
+  addBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, alignSelf: 'center', marginTop: spacing.lg },
+  addBtnText: { color: colors.coral, fontSize: 12, fontWeight: '600' },
+  empty: { textAlign: 'center', marginTop: spacing.xl, color: colors.textSecondary },
+});

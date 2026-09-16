@@ -1,10 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { PlayerBar } from '../src/components/PlayerBar';
 import { TopBar } from '../src/components/TopBar';
 import { generatePresentation } from '../src/data/situational';
+import { usePhrases } from '../src/store/PhraseContext';
 import { colors, radius, spacing } from '../src/theme/colors';
 import { toSlashReading } from '../src/utils/slashReading';
 
@@ -14,6 +15,7 @@ export default function PresentationMaterialScreen() {
   const [regenUsed, setRegenUsed] = useState(false);
   const [langPage, setLangPage] = useState<0 | 1>(0);
   const [slashOn, setSlashOn] = useState(false);
+  const { openRegister } = usePhrases();
 
   const p = useMemo(() => generatePresentation(variant), [variant]);
   const enBlocks = slashOn ? p.paragraphsEN.map(toSlashReading) : p.paragraphsEN;
@@ -70,7 +72,7 @@ export default function PresentationMaterialScreen() {
 
       <Pressable
         style={styles.phraseBtn}
-        onPress={() => Alert.alert('MYフレーズ', 'フレーズ登録機能はPhase5で実装予定です。')}
+        onPress={() => openRegister('', true)}
       >
         <Ionicons name="bookmark-outline" size={14} color={colors.coral} />
         <Text style={styles.phraseBtnText}>気になった表現をMYフレーズに登録する</Text>
