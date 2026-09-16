@@ -8,7 +8,6 @@ import { ScreenHeader } from '../../src/components/ScreenHeader';
 import {
   ALL_USERS_MOCK,
   OTHER_GROUPS_MOCK,
-  RECORD_GOALS,
   RecordPeriod,
   RecordScope,
   StudyLogEntry,
@@ -21,6 +20,7 @@ import {
   recordChartTotalBuckets,
   studyLogEntries as initialStudyLogEntries,
 } from '../../src/data/records';
+import { useGoals } from '../../src/store/GoalsContext';
 import { useProfile } from '../../src/store/ProfileContext';
 import { colors, radius, spacing } from '../../src/theme/colors';
 import { dateKey, formatMin, shortMd } from '../../src/utils/dateHelpers';
@@ -31,6 +31,7 @@ const WINDOW: Record<RecordPeriod, number> = { day: 7, week: 6, month: Infinity,
 // screen key: records
 export default function RecordsScreen() {
   const { profile } = useProfile();
+  const { studyGoal, speakGoal } = useGoals();
   const [scope, setScope] = useState<RecordScope>('personal');
   const [period, setPeriod] = useState<RecordPeriod>('day');
   const [offset, setOffset] = useState<Record<RecordPeriod, number>>({ day: 0, week: 0, month: 0, all: 0 });
@@ -45,7 +46,7 @@ export default function RecordsScreen() {
   const totalBuckets = recordChartTotalBuckets(scope, period);
   const selIdx = selected[period] === null ? buckets.length - 1 : Math.min(selected[period]!, buckets.length - 1);
   const sel = buckets[selIdx] ?? { label: '', studyMin: 0, speakMin: 0, days: 1 };
-  const goal = RECORD_GOALS[scope];
+  const goal = scope === 'personal' ? { study: studyGoal, speak: speakGoal } : { study: studyGoal * 12, speak: speakGoal * 12 };
   const studyTarget = Math.round(goal.study * sel.days);
   const speakTarget = Math.round(goal.speak * sel.days);
 

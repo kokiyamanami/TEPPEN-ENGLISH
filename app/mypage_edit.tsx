@@ -1,0 +1,33 @@
+import { router } from 'expo-router';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { OnboardFieldInput } from '../src/components/OnboardFieldInput';
+import { TopBar } from '../src/components/TopBar';
+import { onboardSteps } from '../src/data/onboarding';
+import { colors, radius, spacing } from '../src/theme/colors';
+
+// screen key: mypage_edit
+export default function MyPageEditScreen() {
+  return (
+    <ScrollView style={styles.screen}>
+      <TopBar title="プロフィール編集" backRoute="/(tabs)/mypage" />
+      {onboardSteps.map((step) => (
+        <View key={step.key}>
+          <Text style={styles.sectionTitle}>{step.title}</Text>
+          {step.fields.map((f) => (
+            <OnboardFieldInput key={f.field} field={f} />
+          ))}
+        </View>
+      ))}
+      <Pressable style={styles.saveBtn} onPress={() => router.replace('/(tabs)/mypage')}>
+        <Text style={styles.saveBtnText}>保存して戻る</Text>
+      </Pressable>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: colors.background },
+  sectionTitle: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, marginHorizontal: spacing.lg, marginTop: spacing.lg, marginBottom: spacing.xs },
+  saveBtn: { backgroundColor: colors.coral, borderRadius: radius.pill, marginHorizontal: spacing.lg, marginVertical: spacing.xl, paddingVertical: spacing.md, alignItems: 'center' },
+  saveBtnText: { color: colors.white, fontWeight: '700' },
+});

@@ -17,11 +17,6 @@ function buildDailyStats(days: number, studyBase: number, speakRatio: number): D
 export const personalDailyStats = buildDailyStats(90, 80, 0.35);
 export const groupDailyStatsRecords = buildDailyStats(90, 80 * 12, 0.35);
 
-export const RECORD_GOALS = {
-  personal: { study: 90, speak: 30 },
-  group: { study: 90 * 12, speak: 30 * 12 },
-};
-
 export type RecordScope = 'personal' | 'group';
 export type RecordPeriod = 'day' | 'week' | 'month' | 'all';
 
