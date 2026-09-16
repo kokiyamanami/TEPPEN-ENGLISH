@@ -5,6 +5,7 @@ import { PhraseRegisterModal } from '../src/components/PhraseRegisterModal';
 import { LectureProvider } from '../src/store/LectureContext';
 import { PhraseProvider } from '../src/store/PhraseContext';
 import { ProfileProvider } from '../src/store/ProfileContext';
+import { TalkProvider } from '../src/store/TalkContext';
 
 export default function RootLayout() {
   return (
@@ -12,12 +13,14 @@ export default function RootLayout() {
       <ProfileProvider>
         <LectureProvider>
           <PhraseProvider>
-            <StatusBar style="dark" />
-            <Stack screenOptions={{ headerShown: false }}>
-              <Stack.Screen name="index" />
-              <Stack.Screen name="(tabs)" />
-            </Stack>
-            <PhraseRegisterModal />
+            <TalkProvider>
+              <StatusBar style="dark" />
+              <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="index" />
+                <Stack.Screen name="(tabs)" />
+              </Stack>
+              <PhraseRegisterModal />
+            </TalkProvider>
           </PhraseProvider>
         </LectureProvider>
       </ProfileProvider>
