@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { BrandLogo } from '../src/components/BrandLogo';
 import { useProfile } from '../src/store/ProfileContext';
 import { useSession } from '../src/store/SessionContext';
 import { colors, radius, spacing } from '../src/theme/colors';
@@ -37,7 +38,7 @@ export default function SplashScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.mark}>⛰️</Text>
+      <BrandLogo width={180} />
       <Text style={styles.title}>コーチング型 英語学習</Text>
       <Text style={styles.subtitle}>
         プロフィールに合わせてAIが教材を作る、{'\n'}登頂型の英語トレーニング。

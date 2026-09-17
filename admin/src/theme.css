@@ -1,15 +1,18 @@
+/* TEPPEN ENGLISH公式ブランドブック準拠 https://hsato-lgtm.github.io/teppen-english-brand-book/ */
 :root {
-  --navy: #14365a;
-  --navy-light: #24507f;
-  --coral: #e8825f;
-  --coral-light: #f2a78a;
-  --bg: #f7f8fa;
+  --navy: #00375d;
+  --navy-light: #133d5f;
+  --coral: #076fb3; /* CTA Blue */
+  --coral-light: #4185be;
+  --bg: #e4ebef; /* Light Blue Gray */
   --white: #ffffff;
-  --border: #e3e7ed;
-  --text: #14365a;
-  --text-secondary: #6b7785;
+  --border: #eeeeee;
+  --text: #333333;
+  --text-secondary: #6b7280;
   --success: #3c9a5f;
-  --danger: #d64545;
+  --danger: #e53e3e;
+  --gold: #c69d58;
+  --gold-light: #fdecbb;
 }
 
 * {
@@ -50,10 +53,22 @@ select {
 
 .sidebar-brand {
   padding: 0 20px 20px;
-  font-weight: 700;
-  font-size: 15px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.12);
   margin-bottom: 12px;
+}
+
+.sidebar-logo {
+  width: 140px;
+  height: auto;
+  display: block;
+}
+
+.sidebar-brand-sub {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--gold-light);
+  letter-spacing: 0.05em;
 }
 
 .sidebar-group-label {

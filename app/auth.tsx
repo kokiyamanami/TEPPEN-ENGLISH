@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { BrandLogo } from '../src/components/BrandLogo';
 import { useProfile } from '../src/store/ProfileContext';
 import { useSession } from '../src/store/SessionContext';
 import { colors, radius, spacing } from '../src/theme/colors';
@@ -57,7 +58,7 @@ export default function AuthScreen() {
   return (
     <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.mark}>⛰️</Text>
+        <BrandLogo width={140} contained />
         <Text style={styles.title}>{isSignup ? 'はじめまして' : 'おかえりなさい'}</Text>
         <Text style={styles.sub}>
           {isSignup ? 'アカウントを作成して、登頂を始めましょう' : 'ログインして続きから登りましょう'}

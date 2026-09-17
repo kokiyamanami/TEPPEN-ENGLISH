@@ -1,4 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom';
+import logoWhite from '../assets/logo-white.png';
 import { useAuth } from '../context/AuthContext';
 
 const MAIN_LINKS = [
@@ -20,7 +21,10 @@ export function Sidebar() {
 
   return (
     <nav className="sidebar">
-      <div className="sidebar-brand">BASE CAMP English 管理画面</div>
+      <div className="sidebar-brand">
+        <img src={logoWhite} alt="TEPPEN ENGLISH" className="sidebar-logo" />
+        <span className="sidebar-brand-sub">管理画面</span>
+      </div>
       <div className="sidebar-group-label">メイン</div>
       {MAIN_LINKS.map((l) => (
         <NavLink key={l.to} to={l.to} className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}>
