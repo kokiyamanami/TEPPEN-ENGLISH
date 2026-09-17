@@ -21,8 +21,8 @@ function shuffle<T>(arr: T[]): T[] {
 export default function QuizScreen() {
   const { folderId } = useLocalSearchParams<{ folderId?: string }>();
   const { folders, phrases } = usePhrases();
-  const folder = folders.find((f) => f.id === folderId);
-  const folderPhrases = phrases.filter((p) => p.folderId === folderId);
+  const folder = folders.find((f) => f.id === Number(folderId));
+  const folderPhrases = phrases.filter((p) => p.folder_id === Number(folderId));
 
   const [count, setCount] = useState(30);
   const [order, setOrder] = useState<(typeof ORDER_OPTIONS)[number]>('ランダム');
@@ -59,7 +59,7 @@ export default function QuizScreen() {
         </Text>
         <Pressable style={styles.quizCard} onPress={() => setRevealed((v) => !v)}>
           <Text style={styles.quizEn}>&quot;{q.text}&quot;</Text>
-          {revealed && q.textJP ? <Text style={styles.quizJp}>{q.textJP}</Text> : <Text style={styles.tapHint}>タップして和訳を見る</Text>}
+          {revealed && q.text_jp ? <Text style={styles.quizJp}>{q.text_jp}</Text> : <Text style={styles.tapHint}>タップして和訳を見る</Text>}
         </Pressable>
         <Pressable
           style={styles.primaryBtn}

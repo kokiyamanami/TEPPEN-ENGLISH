@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { apiDelete, apiGet, apiPost } from '../../src/api/mobileAuth';
 import { fetchRanking, RankingGroup, RankingUser } from '../../src/api/ranking';
 import { CalendarGrid } from '../../src/components/CalendarGrid';
 import { DaySheet } from '../../src/components/DaySheet';
@@ -8,6 +9,7 @@ import { RecordChart } from '../../src/components/RecordChart';
 import { ScreenHeader } from '../../src/components/ScreenHeader';
 import {
   ALL_USERS_MOCK_FALLBACK,
+  DailyStat,
   OTHER_GROUPS_MOCK_FALLBACK,
   RecordPeriod,
   RecordScope,
@@ -15,16 +17,23 @@ import {
   buildUnifiedSpeakingLog,
   groupMembers,
   memberTotalForRankingPeriod,
-  personalDailyStats,
   personalTotalForRankingPeriod,
   recordChartBuckets,
   recordChartTotalBuckets,
-  studyLogEntries as initialStudyLogEntries,
 } from '../../src/data/records';
 import { useGoals } from '../../src/store/GoalsContext';
 import { useProfile } from '../../src/store/ProfileContext';
 import { colors, radius, spacing } from '../../src/theme/colors';
 import { dateKey, formatMin, shortMd } from '../../src/utils/dateHelpers';
+
+type MobileRecord = { date: string; study_min: number; speak_min: number; category: string | null; subcategories: string[]; memo: string | null };
+
+function isoDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 
 const PERIOD_LABEL: Record<RecordPeriod, string> = { day: '日別', week: '週別', month: '月別', all: '全期間' };
 const WINDOW: Record<RecordPeriod, number> = { day: 7, week: 6, month: Infinity, all: Infinity };
@@ -38,13 +47,39 @@ export default function RecordsScreen() {
   const [offset, setOffset] = useState<Record<RecordPeriod, number>>({ day: 0, week: 0, month: 0, all: 0 });
   const [selected, setSelected] = useState<Record<RecordPeriod, number | null>>({ day: null, week: null, month: null, all: 0 });
 
-  const [entries, setEntries] = useState<Record<string, StudyLogEntry>>(initialStudyLogEntries);
+  const [entries, setEntries] = useState<Record<string, StudyLogEntry>>({});
+  const [personalData, setPersonalData] = useState<DailyStat[]>([]);
   const [calMonth, setCalMonth] = useState(new Date());
   const [sheetVisible, setSheetVisible] = useState(false);
   const [sheetDate, setSheetDate] = useState<Date | null>(null);
 
-  const buckets = useMemo(() => recordChartBuckets(scope, period, offset[period]), [scope, period, offset]);
-  const totalBuckets = recordChartTotalBuckets(scope, period);
+  const loadRecords = useCallback(() => {
+    apiGet<MobileRecord[]>('/records').then((rows) => {
+      const nextEntries: Record<string, StudyLogEntry> = {};
+      const nextData: DailyStat[] = [];
+      rows.forEach((r) => {
+        const [y, m, d] = r.date.split('-').map(Number);
+        const dt = new Date(y, m - 1, d);
+        nextEntries[dateKey(dt)] = {
+          category: r.category || 'other',
+          subcategories: r.subcategories,
+          minutes: r.study_min,
+          memo: r.memo || '',
+        };
+        nextData.push({ date: dt, studyMin: r.study_min, speakMin: r.speak_min });
+      });
+      nextData.sort((a, b) => a.date.getTime() - b.date.getTime());
+      setEntries(nextEntries);
+      setPersonalData(nextData);
+    });
+  }, []);
+
+  useEffect(() => {
+    loadRecords();
+  }, [loadRecords]);
+
+  const buckets = useMemo(() => recordChartBuckets(scope, period, offset[period], personalData), [scope, period, offset, personalData]);
+  const totalBuckets = recordChartTotalBuckets(scope, period, personalData);
   const selIdx = selected[period] === null ? buckets.length - 1 : Math.min(selected[period]!, buckets.length - 1);
   const sel = buckets[selIdx] ?? { label: '', studyMin: 0, speakMin: 0, days: 1 };
   const goal = scope === 'personal' ? { study: studyGoal, speak: speakGoal } : { study: studyGoal * 12, speak: speakGoal * 12 };
@@ -60,27 +95,33 @@ export default function RecordsScreen() {
     setSheetVisible(true);
   };
 
-  const saveEntry = (entry: StudyLogEntry) => {
+  const saveEntry = async (entry: StudyLogEntry) => {
     if (!sheetDate) return;
-    setEntries((prev) => ({ ...prev, [dateKey(sheetDate)]: entry }));
     setSheetVisible(false);
-  };
-
-  const deleteEntry = () => {
-    if (!sheetDate) return;
-    setEntries((prev) => {
-      const next = { ...prev };
-      delete next[dateKey(sheetDate)];
-      return next;
+    await apiPost('/records', {
+      date: isoDate(sheetDate),
+      category: entry.category,
+      subcategories: entry.subcategories,
+      minutes: entry.minutes,
+      memo: entry.memo,
     });
-    setSheetVisible(false);
+    loadRecords();
   };
 
+  const deleteEntry = async () => {
+    if (!sheetDate) return;
+    setSheetVisible(false);
+    await apiDelete(`/records/${isoDate(sheetDate)}`);
+    loadRecords();
+  };
+
+  // TODO: Daily/Weeklyミッション結果・フリー練習ログの永続化テーブルが未実装のためモックのまま
+  // （Monthlyミッションのみ /api/mobile/monthly-mission でバックエンドと共有済み）
   const speakingLog = useMemo(() => buildUnifiedSpeakingLog(), []);
 
   // ---- ranking ----
   const rankingPeriodNoun = PERIOD_LABEL[period];
-  const myPersonalTotal = personalTotalForRankingPeriod(period);
+  const myPersonalTotal = personalTotalForRankingPeriod(period, personalData);
   const [rankingUsers, setRankingUsers] = useState<RankingUser[]>(ALL_USERS_MOCK_FALLBACK);
   const [rankingGroups, setRankingGroups] = useState<RankingGroup[]>(OTHER_GROUPS_MOCK_FALLBACK);
   const [rankingLoading, setRankingLoading] = useState(true);

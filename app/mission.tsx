@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { apiPost } from '../src/api/mobileAuth';
 import { submitForGrading } from '../src/api/grading';
 import { RecordCard } from '../src/components/RecordCard';
 import { ResultView } from '../src/components/ResultView';
@@ -9,7 +10,7 @@ import { useAudioRecordFlow } from '../src/hooks/useAudioRecordFlow';
 import { colors, radius, spacing } from '../src/theme/colors';
 
 // screen key: mission (Monthlyミッション「MYピッチ」)
-// TODO(Phase10): メモ内容の永続化（現状はローカル状態のみ）
+// TODO: メモ内容の永続化（現状はローカル状態のみ）
 export default function MissionScreen() {
   const record = useAudioRecordFlow();
   const [memo, setMemo] = useState('');
@@ -27,6 +28,7 @@ export default function MissionScreen() {
         ''
       );
       setResult(res);
+      await apiPost('/monthly-mission', { pass: res.pass }).catch(() => {});
     } catch (e) {
       Alert.alert('添削に失敗しました', 'サーバーに接続できませんでした。もう一度お試しください。');
     } finally {

@@ -1,32 +1,32 @@
-import { createContext, ReactNode, useContext, useMemo, useState } from 'react';
-import { PHRASE_FOLDERS_SEED, PHRASES_SEED, PhraseFolderSource } from '../data/phraseSeed';
+import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react';
+import { apiDelete, apiGet, apiPatch, apiPost } from '../api/mobileAuth';
+import { useSession } from './SessionContext';
 
-export type PhraseFolder = { id: string; name: string; source: PhraseFolderSource };
-export type Phrase = { id: string; folderId: string; text: string; textJP: string; learned: boolean };
+export type PhraseFolderSource = 'official' | 'custom';
+export type PhraseFolder = { id: number; name: string; source: PhraseFolderSource };
+export type Phrase = { id: number; folder_id: number; text: string; text_jp: string; learned: number };
 
-type RegisterState = { visible: boolean; text: string; editable: boolean; folderId: string | null };
+type RegisterState = { visible: boolean; text: string; editable: boolean; folderId: number | null };
 
 type PhraseContextValue = {
   folders: PhraseFolder[];
   phrases: Phrase[];
-  folderCount: (folderId: string) => number;
-  addFolder: (name: string) => string;
-  deleteFolder: (id: string) => void;
-  toggleLearned: (id: string) => void;
+  folderCount: (folderId: number) => number;
+  addFolder: (name: string) => Promise<number>;
+  deleteFolder: (id: number) => void;
+  toggleLearned: (id: number) => void;
   registerState: RegisterState;
-  openRegister: (text: string, editable: boolean, folderId?: string | null) => void;
+  openRegister: (text: string, editable: boolean, folderId?: number | null) => void;
   closeRegister: () => void;
-  confirmRegister: (text: string, folderId: string) => void;
+  confirmRegister: (text: string, folderId: number) => void;
 };
 
 const PhraseContext = createContext<PhraseContextValue | null>(null);
 
-let folderIdCounter = 100;
-let phraseIdCounter = 100;
-
 export function PhraseProvider({ children }: { children: ReactNode }) {
-  const [folders, setFolders] = useState<PhraseFolder[]>(PHRASE_FOLDERS_SEED);
-  const [phrases, setPhrases] = useState<Phrase[]>(PHRASES_SEED.map((p) => ({ ...p, learned: false })));
+  const { isAuthenticated } = useSession();
+  const [folders, setFolders] = useState<PhraseFolder[]>([]);
+  const [phrases, setPhrases] = useState<Phrase[]>([]);
   const [registerState, setRegisterState] = useState<RegisterState>({
     visible: false,
     text: '',
@@ -34,33 +34,46 @@ export function PhraseProvider({ children }: { children: ReactNode }) {
     folderId: null,
   });
 
-  const folderCount = (folderId: string) => phrases.filter((p) => p.folderId === folderId).length;
-
-  const addFolder = (name: string) => {
-    const id = `f${folderIdCounter++}`;
-    setFolders((prev) => [...prev, { id, name, source: 'custom' }]);
-    return id;
+  const load = async () => {
+    const [f, p] = await Promise.all([apiGet<PhraseFolder[]>('/phrase-folders'), apiGet<Phrase[]>('/phrases')]);
+    setFolders(f);
+    setPhrases(p);
   };
 
-  const deleteFolder = (id: string) => {
+  useEffect(() => {
+    if (isAuthenticated) load().catch(() => {});
+  }, [isAuthenticated]);
+
+  const folderCount = (folderId: number) => phrases.filter((p) => p.folder_id === folderId).length;
+
+  const addFolder = async (name: string) => {
+    const res = await apiPost<{ id: number }>('/phrase-folders', { name });
+    setFolders((prev) => [...prev, { id: res.id, name, source: 'custom' }]);
+    return res.id;
+  };
+
+  const deleteFolder = async (id: number) => {
     setFolders((prev) => prev.filter((f) => f.id !== id));
-    setPhrases((prev) => prev.filter((p) => p.folderId !== id));
+    setPhrases((prev) => prev.filter((p) => p.folder_id !== id));
+    await apiDelete(`/phrase-folders/${id}`);
   };
 
-  const toggleLearned = (id: string) => {
-    setPhrases((prev) => prev.map((p) => (p.id === id ? { ...p, learned: !p.learned } : p)));
+  const toggleLearned = async (id: number) => {
+    setPhrases((prev) => prev.map((p) => (p.id === id ? { ...p, learned: p.learned ? 0 : 1 } : p)));
+    const target = phrases.find((p) => p.id === id);
+    await apiPatch(`/phrases/${id}`, { learned: !target?.learned });
   };
 
-  const openRegister = (text: string, editable: boolean, folderId: string | null = null) => {
+  const openRegister = (text: string, editable: boolean, folderId: number | null = null) => {
     setRegisterState({ visible: true, text, editable, folderId: folderId ?? folders[0]?.id ?? null });
   };
 
   const closeRegister = () => setRegisterState((prev) => ({ ...prev, visible: false }));
 
-  const confirmRegister = (text: string, folderId: string) => {
-    const id = `p${phraseIdCounter++}`;
-    setPhrases((prev) => [...prev, { id, folderId, text, textJP: '', learned: false }]);
+  const confirmRegister = async (text: string, folderId: number) => {
     setRegisterState((prev) => ({ ...prev, visible: false }));
+    const res = await apiPost<{ id: number }>('/phrases', { folderId, text, textJP: '' });
+    setPhrases((prev) => [...prev, { id: res.id, folder_id: folderId, text, text_jp: '', learned: 0 }]);
   };
 
   const value = useMemo(

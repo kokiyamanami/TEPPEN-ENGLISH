@@ -1,4 +1,5 @@
 import { createContext, ReactNode, useContext, useState } from 'react';
+import { apiGet, apiPatch } from '../api/mobileAuth';
 
 export type Profile = {
   name: string;
@@ -39,6 +40,8 @@ export const emptyProfile: Profile = {
 type ProfileContextValue = {
   profile: Profile;
   setField: (field: keyof Profile, value: string) => void;
+  loadProfile: () => Promise<void>;
+  saveProfile: () => Promise<void>;
 };
 
 const ProfileContext = createContext<ProfileContextValue | null>(null);
@@ -50,7 +53,18 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     setProfile((prev) => ({ ...prev, [field]: value }));
   };
 
-  return <ProfileContext.Provider value={{ profile, setField }}>{children}</ProfileContext.Provider>;
+  // ログイン直後・アプリ再起動時にサーバーから最新プロフィールを取得
+  const loadProfile = async () => {
+    const res = await apiGet<{ profile: Partial<Profile> }>('/me');
+    setProfile((prev) => ({ ...prev, ...res.profile }));
+  };
+
+  // オンボーディング完了時・プロフィール編集保存時にサーバーへ反映
+  const saveProfile = async () => {
+    await apiPatch('/profile', profile);
+  };
+
+  return <ProfileContext.Provider value={{ profile, setField, loadProfile, saveProfile }}>{children}</ProfileContext.Provider>;
 }
 
 export function useProfile() {

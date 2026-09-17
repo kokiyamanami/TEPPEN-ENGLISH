@@ -15,8 +15,8 @@ export default function PhraseFolderScreen() {
   const { folders, phrases, toggleLearned, openRegister } = usePhrases();
   const { profile } = useProfile();
   const voice = voiceForGender(profile.voiceGender);
-  const folder = folders.find((f) => f.id === folderId);
-  const folderPhrases = phrases.filter((p) => p.folderId === folderId);
+  const folder = folders.find((f) => f.id === Number(folderId));
+  const folderPhrases = phrases.filter((p) => p.folder_id === Number(folderId));
 
   const [index, setIndex] = useState(0);
   const [showJP, setShowJP] = useState(false);
@@ -66,7 +66,7 @@ export default function PhraseFolderScreen() {
           {index + 1} / {folderPhrases.length}
         </Text>
         <Text style={styles.en}>&quot;{current.text}&quot;</Text>
-        {showJP && current.textJP ? <Text style={styles.jp}>{current.textJP}</Text> : null}
+        {showJP && current.text_jp ? <Text style={styles.jp}>{current.text_jp}</Text> : null}
         <View style={styles.rowBtns}>
           <TtsLineButton text={current.text} voice={voice} style={styles.iconBtn} size={16} />
           <Pressable style={styles.iconBtn} onPress={() => setShowJP((v) => !v)} hitSlop={8}>
@@ -76,13 +76,13 @@ export default function PhraseFolderScreen() {
       </View>
 
       <Pressable
-        style={[styles.learnedBtn, current.learned && styles.learnedBtnDone]}
+        style={[styles.learnedBtn, !!current.learned && styles.learnedBtnDone]}
         onPress={() => {
           toggleLearned(current.id);
           next();
         }}
       >
-        <Text style={[styles.learnedText, current.learned && styles.learnedTextDone]}>覚えた ✓</Text>
+        <Text style={[styles.learnedText, !!current.learned && styles.learnedTextDone]}>覚えた ✓</Text>
       </Pressable>
 
       <Pressable style={styles.addBtn} onPress={() => openRegister('', true, folder.id)}>

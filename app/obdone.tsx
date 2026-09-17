@@ -1,9 +1,26 @@
 import { router } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useProfile } from '../src/store/ProfileContext';
 import { colors, radius, spacing } from '../src/theme/colors';
 
 // screen key: obdone
 export default function ObDoneScreen() {
+  const { saveProfile } = useProfile();
+  const [saving, setSaving] = useState(false);
+
+  const finish = async () => {
+    setSaving(true);
+    try {
+      await saveProfile();
+    } catch {
+      // 保存に失敗してもオンボーディングは継続させる（次回プロフィール編集画面で再保存可能）
+    } finally {
+      setSaving(false);
+      router.replace('/(tabs)/home');
+    }
+  };
+
   return (
     <View style={styles.screen}>
       <Text style={styles.mark}>🚩</Text>
@@ -11,8 +28,8 @@ export default function ObDoneScreen() {
       <Text style={styles.sub}>
         プロフィールをもとに、あなた専用の教材の準備ができました。{'\n'}ここから頂を目指しましょう。
       </Text>
-      <Pressable style={styles.cta} onPress={() => router.replace('/(tabs)/home')}>
-        <Text style={styles.ctaText}>登山を始める</Text>
+      <Pressable style={styles.cta} onPress={finish} disabled={saving}>
+        {saving ? <ActivityIndicator color={colors.white} /> : <Text style={styles.ctaText}>登山を始める</Text>}
       </Pressable>
     </View>
   );

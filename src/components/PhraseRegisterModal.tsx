@@ -7,7 +7,7 @@ import { colors, radius, spacing } from '../theme/colors';
 export function PhraseRegisterModal() {
   const { registerState, closeRegister, confirmRegister, folders, addFolder } = usePhrases();
   const [text, setText] = useState('');
-  const [folderId, setFolderId] = useState<string | null>(null);
+  const [folderId, setFolderId] = useState<number | null>(null);
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
 
@@ -20,9 +20,9 @@ export function PhraseRegisterModal() {
     }
   }, [registerState.visible, registerState.text, registerState.folderId]);
 
-  const confirmNewFolder = () => {
+  const confirmNewFolder = async () => {
     if (!newFolderName.trim()) return;
-    const id = addFolder(newFolderName.trim());
+    const id = await addFolder(newFolderName.trim());
     setFolderId(id);
     setShowNewFolder(false);
     setNewFolderName('');

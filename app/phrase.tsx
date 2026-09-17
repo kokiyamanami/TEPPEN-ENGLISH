@@ -11,7 +11,7 @@ export default function PhraseScreen() {
   const { folders, folderCount, addFolder, deleteFolder, openRegister } = usePhrases();
   const [showAddFolder, setShowAddFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
-  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
 
   const confirmAddFolder = () => {
     if (!newFolderName.trim()) return;

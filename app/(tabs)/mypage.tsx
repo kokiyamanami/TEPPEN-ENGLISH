@@ -5,6 +5,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { ScreenHeader } from '../../src/components/ScreenHeader';
 import { MOCK_TOTAL_STUDY_MINUTES, getCurrentAltitudeM } from '../../src/data/mockHome';
 import { useProfile } from '../../src/store/ProfileContext';
+import { useSession } from '../../src/store/SessionContext';
 import { colors, radius, spacing } from '../../src/theme/colors';
 
 const FIELD_ROWS: { key: keyof ReturnType<typeof useProfile>['profile']; label: string }[] = [
@@ -25,6 +26,7 @@ const FIELD_ROWS: { key: keyof ReturnType<typeof useProfile>['profile']; label: 
 // screen key: mypage
 export default function MyPageScreen() {
   const { profile } = useProfile();
+  const { logout } = useSession();
   const [logoutOpen, setLogoutOpen] = useState(false);
   const altitudeM = getCurrentAltitudeM(MOCK_TOTAL_STUDY_MINUTES);
 
@@ -91,8 +93,9 @@ export default function MyPageScreen() {
               </Pressable>
               <Pressable
                 style={styles.confirmBtn}
-                onPress={() => {
+                onPress={async () => {
                   setLogoutOpen(false);
+                  await logout();
                   router.replace('/');
                 }}
               >

@@ -1,9 +1,35 @@
 import { router } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useProfile } from '../src/store/ProfileContext';
+import { useSession } from '../src/store/SessionContext';
 import { colors, radius, spacing } from '../src/theme/colors';
 
 // screen key: splash
 export default function SplashScreen() {
+  const { isAuthenticated, loading } = useSession();
+  const { loadProfile } = useProfile();
+  const [resuming, setResuming] = useState(true);
+
+  useEffect(() => {
+    if (loading) return;
+    if (!isAuthenticated) {
+      setResuming(false);
+      return;
+    }
+    loadProfile()
+      .then(() => router.replace('/(tabs)/home'))
+      .catch(() => setResuming(false));
+  }, [loading, isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (resuming) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center' }]}>
+        <ActivityIndicator color={colors.white} />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <Text style={styles.mark}>⛰️</Text>

@@ -1,6 +1,8 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useProfile } from '../src/store/ProfileContext';
+import { useSession } from '../src/store/SessionContext';
 import { colors, radius, spacing } from '../src/theme/colors';
 
 type AuthTab = 'login' | 'signup';
@@ -9,14 +11,46 @@ type AuthTab = 'login' | 'signup';
 export default function AuthScreen() {
   const params = useLocalSearchParams<{ tab?: string }>();
   const [tab, setTab] = useState<AuthTab>(params.tab === 'login' ? 'login' : 'signup');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [agreed, setAgreed] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const { signup, login } = useSession();
+  const { loadProfile } = useProfile();
 
   const isSignup = tab === 'signup';
 
-  const onSubmit = () => {
-    if (isSignup) {
-      router.push('/ob1');
-    } else {
-      router.replace('/(tabs)/home');
+  const onSubmit = async () => {
+    setError(null);
+    if (!email.trim() || !password) {
+      setError('メールアドレスとパスワードを入力してください');
+      return;
+    }
+    if (isSignup && password !== confirmPassword) {
+      setError('パスワードが一致しません');
+      return;
+    }
+    if (isSignup && !agreed) {
+      setError('利用規約・プライバシーポリシーへの同意が必要です');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      if (isSignup) {
+        await signup(email.trim(), password);
+        router.push('/ob1');
+      } else {
+        await login(email.trim(), password);
+        await loadProfile();
+        router.replace('/(tabs)/home');
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '通信に失敗しました');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -38,21 +72,25 @@ export default function AuthScreen() {
           </Pressable>
         </View>
 
-        <Field label="メールアドレス" placeholder="kenta.sato@example.com" />
-        <Field label="パスワード" placeholder="••••••••" secure />
-        {isSignup && <Field label="パスワード（確認）" placeholder="••••••••" secure />}
+        <Field label="メールアドレス" placeholder="kenta.sato@example.com" value={email} onChangeText={setEmail} />
+        <Field label="パスワード" placeholder="••••••••" secure value={password} onChangeText={setPassword} />
+        {isSignup && (
+          <Field label="パスワード（確認）" placeholder="••••••••" secure value={confirmPassword} onChangeText={setConfirmPassword} />
+        )}
 
         {isSignup ? (
-          <Pressable style={styles.checkRow}>
-            <View style={styles.checkbox} />
+          <Pressable style={styles.checkRow} onPress={() => setAgreed((v) => !v)}>
+            <View style={[styles.checkbox, agreed && styles.checkboxChecked]} />
             <Text style={styles.checkLabel}>利用規約・プライバシーポリシーに同意する</Text>
           </Pressable>
         ) : (
           <Text style={styles.forgot}>パスワードをお忘れですか？</Text>
         )}
 
-        <Pressable style={styles.cta} onPress={onSubmit}>
-          <Text style={styles.ctaText}>{isSignup ? 'アカウントを作成' : 'ログイン'}</Text>
+        {error && <Text style={styles.errorText}>{error}</Text>}
+
+        <Pressable style={styles.cta} onPress={onSubmit} disabled={submitting}>
+          {submitting ? <ActivityIndicator color={colors.white} /> : <Text style={styles.ctaText}>{isSignup ? 'アカウントを作成' : 'ログイン'}</Text>}
         </Pressable>
 
         <Text style={styles.switchText}>
@@ -66,7 +104,19 @@ export default function AuthScreen() {
   );
 }
 
-function Field({ label, placeholder, secure }: { label: string; placeholder: string; secure?: boolean }) {
+function Field({
+  label,
+  placeholder,
+  secure,
+  value,
+  onChangeText,
+}: {
+  label: string;
+  placeholder: string;
+  secure?: boolean;
+  value: string;
+  onChangeText: (t: string) => void;
+}) {
   return (
     <View style={styles.fieldBlock}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -76,6 +126,8 @@ function Field({ label, placeholder, secure }: { label: string; placeholder: str
         placeholderTextColor={colors.textSecondary}
         secureTextEntry={secure}
         autoCapitalize="none"
+        value={value}
+        onChangeText={onChangeText}
       />
     </View>
   );
@@ -114,8 +166,10 @@ const styles = StyleSheet.create({
   },
   checkRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md },
   checkbox: { width: 18, height: 18, borderRadius: 4, borderWidth: 1, borderColor: colors.border },
+  checkboxChecked: { backgroundColor: colors.coral, borderColor: colors.coral },
   checkLabel: { fontSize: 12, color: colors.textSecondary, flexShrink: 1 },
   forgot: { fontSize: 12, color: colors.textSecondary, textAlign: 'right', marginTop: spacing.md },
+  errorText: { color: colors.danger, fontSize: 12, marginTop: spacing.md, textAlign: 'center' },
   cta: {
     backgroundColor: colors.coral,
     borderRadius: radius.pill,

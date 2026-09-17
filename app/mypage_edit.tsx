@@ -1,12 +1,27 @@
 import { router } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { OnboardFieldInput } from '../src/components/OnboardFieldInput';
 import { TopBar } from '../src/components/TopBar';
 import { onboardSteps } from '../src/data/onboarding';
+import { useProfile } from '../src/store/ProfileContext';
 import { colors, radius, spacing } from '../src/theme/colors';
 
 // screen key: mypage_edit
 export default function MyPageEditScreen() {
+  const { saveProfile } = useProfile();
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await saveProfile();
+    } finally {
+      setSaving(false);
+      router.replace('/(tabs)/mypage');
+    }
+  };
+
   return (
     <ScrollView style={styles.screen}>
       <TopBar title="プロフィール編集" backRoute="/(tabs)/mypage" />
@@ -18,8 +33,8 @@ export default function MyPageEditScreen() {
           ))}
         </View>
       ))}
-      <Pressable style={styles.saveBtn} onPress={() => router.replace('/(tabs)/mypage')}>
-        <Text style={styles.saveBtnText}>保存して戻る</Text>
+      <Pressable style={styles.saveBtn} onPress={save} disabled={saving}>
+        {saving ? <ActivityIndicator color={colors.white} /> : <Text style={styles.saveBtnText}>保存して戻る</Text>}
       </Pressable>
     </ScrollView>
   );

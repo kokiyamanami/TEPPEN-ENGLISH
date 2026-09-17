@@ -22,8 +22,8 @@ export type RecordPeriod = 'day' | 'week' | 'month' | 'all';
 
 export type ChartBucket = { label: string; studyMin: number; speakMin: number; days: number };
 
-export function recordChartBuckets(scope: RecordScope, period: RecordPeriod, offset: number): ChartBucket[] {
-  const arr = scope === 'personal' ? personalDailyStats : groupDailyStatsRecords;
+export function recordChartBuckets(scope: RecordScope, period: RecordPeriod, offset: number, personalData?: DailyStat[]): ChartBucket[] {
+  const arr = scope === 'personal' ? personalData ?? personalDailyStats : groupDailyStatsRecords;
   const WINDOW = period === 'day' ? 7 : period === 'week' ? 6 : Infinity;
 
   if (period === 'day') {
@@ -75,14 +75,15 @@ export function recordChartBuckets(scope: RecordScope, period: RecordPeriod, off
   return [{ label: '全期間', studyMin: total.studyMin, speakMin: total.speakMin, days: arr.length }];
 }
 
-export function recordChartTotalBuckets(scope: RecordScope, period: RecordPeriod): number {
-  if (period === 'day') return (scope === 'personal' ? personalDailyStats : groupDailyStatsRecords).length;
+export function recordChartTotalBuckets(scope: RecordScope, period: RecordPeriod, personalData?: DailyStat[]): number {
+  const personalArr = personalData ?? personalDailyStats;
+  if (period === 'day') return (scope === 'personal' ? personalArr : groupDailyStatsRecords).length;
   if (period === 'week') {
-    const set = new Set((scope === 'personal' ? personalDailyStats : groupDailyStatsRecords).map((x) => weekKey(x.date)));
+    const set = new Set((scope === 'personal' ? personalArr : groupDailyStatsRecords).map((x) => weekKey(x.date)));
     return set.size;
   }
   if (period === 'month') {
-    const set = new Set((scope === 'personal' ? personalDailyStats : groupDailyStatsRecords).map((x) => monthKey(x.date)));
+    const set = new Set((scope === 'personal' ? personalArr : groupDailyStatsRecords).map((x) => monthKey(x.date)));
     return set.size;
   }
   return 1;
@@ -169,8 +170,9 @@ export function memberTotalForRankingPeriod(weeklyMin: number, period: RecordPer
   return Math.round(weeklyMin * 12);
 }
 
-export function personalTotalForRankingPeriod(period: RecordPeriod): number {
-  const arr = personalDailyStats;
+export function personalTotalForRankingPeriod(period: RecordPeriod, personalData?: DailyStat[]): number {
+  const arr = personalData ?? personalDailyStats;
+  if (arr.length === 0) return 0;
   if (period === 'day') return arr[arr.length - 1].studyMin;
   if (period === 'week') return arr.slice(-7).reduce((a, x) => a + x.studyMin, 0);
   if (period === 'month') return arr.slice(-30).reduce((a, x) => a + x.studyMin, 0);
