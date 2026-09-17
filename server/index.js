@@ -16,6 +16,7 @@ app.use(cors());
 app.use(express.json({ limit: '2mb' }));
 app.use('/api/admin', adminRoutes);
 app.use('/api/mobile', mobileRoutes);
+app.use(express.static(path.join(__dirname, 'public')));
 
 const upload = multer({ dest: '/tmp/teppen-uploads/' });
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });

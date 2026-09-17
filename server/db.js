@@ -130,6 +130,15 @@ CREATE TABLE IF NOT EXISTS announcements (
   status TEXT NOT NULL DEFAULT 'draft',
   created_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS ad_banners (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  image_url TEXT NOT NULL,
+  link_url TEXT,
+  enabled INTEGER NOT NULL DEFAULT 1,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
 `);
 
 // 既存DB（作成済みのadmin.sqlite）に新カラムを後付けするマイグレーション
@@ -260,6 +269,15 @@ function seedIfEmpty() {
 
   const insertAdmin = db.prepare('INSERT INTO admin_users (name, email, password_hash, role, notify_email) VALUES (?, ?, ?, ?, ?)');
   insertAdmin.run('田中コーチ', 'coach@teppen-english.com', bcrypt.hashSync('teppen2026', 10), 'admin', 1);
+
+  const insertAd = db.prepare('INSERT INTO ad_banners (image_url, link_url, enabled, sort_order, created_at) VALUES (?, ?, ?, ?, ?)');
+  insertAd.run(
+    'https://placehold.jp/076fb3/ffffff/670x180.png?text=TEPPEN%20ENGLISH%20%E4%BD%93%E9%A8%93%E3%83%AC%E3%83%83%E3%82%B9%E3%83%B3',
+    'https://teppen-english.com',
+    1,
+    0,
+    new Date().toISOString().slice(0, 10)
+  );
 
   console.log('Seed complete.');
 }

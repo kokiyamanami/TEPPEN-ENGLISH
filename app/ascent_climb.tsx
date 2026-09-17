@@ -1,7 +1,8 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AscentScene } from '../src/components/AscentScene';
+import { BACKEND_URL } from '../src/config/api';
 import {
   ASCENT_MILESTONES,
   MOCK_TOTAL_STUDY_MINUTES,
@@ -35,12 +36,15 @@ export default function AscentClimbScreen() {
 
         <View style={styles.card}>
           {next ? (
-            <>
-              <Text style={styles.nextTitle}>
-                次の目標：{next.name}（{next.altitudeM.toLocaleString()}M）
-              </Text>
-              <Text style={styles.nextSub}>あと {remainMin}分 の学習で到達します</Text>
-            </>
+            <View style={styles.nextRow}>
+              <Image source={{ uri: `${BACKEND_URL}${next.image}` }} style={styles.nextImg} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.nextTitle}>
+                  次の目標：{next.name}（{next.altitudeM.toLocaleString()}M）
+                </Text>
+                <Text style={styles.nextSub}>あと {remainMin}分 の学習で到達します</Text>
+              </View>
+            </View>
           ) : (
             <>
               <Text style={styles.nextTitle}>🏆 エベレストの頂に到達しました！</Text>
@@ -63,6 +67,7 @@ export default function AscentClimbScreen() {
             <ScrollView style={styles.sheetList}>
               {ASCENT_MILESTONES.map((m) => (
                 <View key={m.order} style={[styles.sheetRow, altitudeM >= m.altitudeM && styles.sheetRowDone]}>
+                  <Image source={{ uri: `${BACKEND_URL}${m.image}` }} style={styles.sheetRowImg} />
                   <Text style={[styles.sheetRowText, altitudeM >= m.altitudeM && styles.sheetRowTextDone]}>
                     {m.name}
                   </Text>
@@ -97,6 +102,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     padding: spacing.lg,
   },
+  nextRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  nextImg: { width: 48, height: 48, borderRadius: radius.md, backgroundColor: colors.background },
   nextTitle: { fontWeight: '700', color: colors.textPrimary, fontSize: 15 },
   nextSub: { color: colors.textSecondary, fontSize: 13, marginTop: spacing.xs },
   viewRoute: { color: colors.coral, fontWeight: '600', fontSize: 13, marginTop: spacing.md },
@@ -113,13 +120,15 @@ const styles = StyleSheet.create({
   sheetList: { marginTop: spacing.md },
   sheetRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: spacing.sm,
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
   sheetRowDone: { opacity: 0.5 },
-  sheetRowText: { color: colors.textPrimary, fontWeight: '600' },
+  sheetRowImg: { width: 32, height: 32, borderRadius: radius.sm, backgroundColor: colors.border },
+  sheetRowText: { flex: 1, color: colors.textPrimary, fontWeight: '600' },
   sheetRowM: { color: colors.textSecondary },
   sheetRowTextDone: { textDecorationLine: 'line-through' },
   closeBtn: {

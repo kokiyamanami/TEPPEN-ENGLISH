@@ -2,6 +2,7 @@ import { Navigate, Route, HashRouter, Routes } from 'react-router-dom';
 import { Sidebar } from './components/Sidebar';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
+import AdBanners from './pages/AdBanners';
 import Announcements from './pages/Announcements';
 import Coaches from './pages/Coaches';
 import GroupDetail from './pages/GroupDetail';
@@ -97,6 +98,14 @@ export default function App() {
               element={
                 <RequireAuth>
                   <Announcements />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/ads"
+              element={
+                <RequireAuth>
+                  <AdBanners />
                 </RequireAuth>
               }
             />

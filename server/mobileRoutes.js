@@ -100,6 +100,14 @@ router.patch('/profile', (req, res) => {
   res.json({ ok: true });
 });
 
+// ---- ad banners（管理画面で自由に設定できるバナー広告） ----
+router.get('/ad-banners', (req, res) => {
+  const rows = db
+    .prepare('SELECT id, image_url, link_url FROM ad_banners WHERE enabled = 1 ORDER BY sort_order, id')
+    .all();
+  res.json(rows.map((r) => ({ id: r.id, imageUrl: r.image_url, linkUrl: r.link_url || '' })));
+});
+
 // ---- study records (records画面のカレンダー/グラフ用) ----
 router.get('/records', (req, res) => {
   const rows = db

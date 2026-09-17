@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { AdBanner } from '../../src/components/AdBanner';
 import { RidgeMini } from '../../src/components/RidgeMini';
 import { ScreenHeader } from '../../src/components/ScreenHeader';
 import {
@@ -50,6 +51,8 @@ export default function HomeScreen() {
           </Pressable>
         ))}
       </View>
+
+      <AdBanner />
     </ScrollView>
   );
 }

@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { WebView } from 'react-native-webview';
 import { BrandLogo } from '../src/components/BrandLogo';
 import { useProfile } from '../src/store/ProfileContext';
 import { useSession } from '../src/store/SessionContext';
@@ -8,6 +9,8 @@ import { colors, radius, spacing } from '../src/theme/colors';
 import { resolveEntryRoute } from '../src/utils/onboardingNav';
 
 type AuthTab = 'login' | 'signup';
+
+const TERMS_URL = 'https://teppen-english.com/terms';
 
 // screen key: auth
 export default function AuthScreen() {
@@ -17,6 +20,8 @@ export default function AuthScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [agreed, setAgreed] = useState(false);
+  const [hasReadTerms, setHasReadTerms] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -33,6 +38,10 @@ export default function AuthScreen() {
     }
     if (isSignup && password !== confirmPassword) {
       setError('パスワードが一致しません');
+      return;
+    }
+    if (isSignup && !hasReadTerms) {
+      setError('利用規約を確認してください');
       return;
     }
     if (isSignup && !agreed) {
@@ -81,10 +90,21 @@ export default function AuthScreen() {
         )}
 
         {isSignup ? (
-          <Pressable style={styles.checkRow} onPress={() => setAgreed((v) => !v)}>
-            <View style={[styles.checkbox, agreed && styles.checkboxChecked]} />
-            <Text style={styles.checkLabel}>利用規約・プライバシーポリシーに同意する</Text>
-          </Pressable>
+          <>
+            <Pressable style={styles.termsLinkRow} onPress={() => setShowTerms(true)}>
+              <Text style={styles.termsLinkText}>
+                {hasReadTerms ? '✓ 利用規約を確認済み　' : ''}
+                <Text style={styles.termsLink}>利用規約を確認する</Text>
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.checkRow, !hasReadTerms && styles.checkRowDisabled]}
+              onPress={() => hasReadTerms && setAgreed((v) => !v)}
+            >
+              <View style={[styles.checkbox, agreed && styles.checkboxChecked]} />
+              <Text style={styles.checkLabel}>利用規約・プライバシーポリシーに同意する</Text>
+            </Pressable>
+          </>
         ) : (
           <Text style={styles.forgot}>パスワードをお忘れですか？</Text>
         )}
@@ -102,6 +122,24 @@ export default function AuthScreen() {
           </Text>
         </Text>
       </ScrollView>
+
+      <Modal visible={showTerms} animationType="slide" onRequestClose={() => setShowTerms(false)}>
+        <View style={styles.termsModal}>
+          <View style={styles.termsHeader}>
+            <Text style={styles.termsHeaderTitle}>利用規約</Text>
+          </View>
+          <WebView source={{ uri: TERMS_URL }} style={{ flex: 1 }} />
+          <Pressable
+            style={styles.termsCloseBtn}
+            onPress={() => {
+              setHasReadTerms(true);
+              setShowTerms(false);
+            }}
+          >
+            <Text style={styles.termsCloseText}>確認しました</Text>
+          </Pressable>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -166,10 +204,31 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.textPrimary,
   },
+  termsLinkRow: { marginTop: spacing.md },
+  termsLinkText: { fontSize: 12, color: colors.textSecondary },
+  termsLink: { color: colors.navy, fontWeight: '700', textDecorationLine: 'underline' },
   checkRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md },
+  checkRowDisabled: { opacity: 0.4 },
   checkbox: { width: 18, height: 18, borderRadius: 4, borderWidth: 1, borderColor: colors.border },
   checkboxChecked: { backgroundColor: colors.coral, borderColor: colors.coral },
   checkLabel: { fontSize: 12, color: colors.textSecondary, flexShrink: 1 },
+  termsModal: { flex: 1, backgroundColor: colors.white },
+  termsHeader: {
+    paddingTop: 56,
+    paddingBottom: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  termsHeaderTitle: { fontSize: 17, fontWeight: '700', color: colors.textPrimary },
+  termsCloseBtn: {
+    backgroundColor: colors.coral,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    margin: spacing.lg,
+    borderRadius: radius.pill,
+  },
+  termsCloseText: { color: colors.white, fontWeight: '700', fontSize: 15 },
   forgot: { fontSize: 12, color: colors.textSecondary, textAlign: 'right', marginTop: spacing.md },
   errorText: { color: colors.danger, fontSize: 12, marginTop: spacing.md, textAlign: 'center' },
   cta: {

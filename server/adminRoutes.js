@@ -329,4 +329,37 @@ router.patch('/announcements/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+// ---- ad banners（モバイルアプリのホーム画面に表示するバナー広告） ----
+router.get('/ads', (req, res) => {
+  res.json(db.prepare('SELECT * FROM ad_banners ORDER BY sort_order, id').all());
+});
+
+router.post('/ads', (req, res) => {
+  const { imageUrl, linkUrl = '', enabled = true, sortOrder = 0 } = req.body || {};
+  if (!imageUrl) return res.status(400).json({ error: 'imageUrl is required' });
+  const info = db
+    .prepare('INSERT INTO ad_banners (image_url, link_url, enabled, sort_order, created_at) VALUES (?, ?, ?, ?, ?)')
+    .run(imageUrl, linkUrl, enabled ? 1 : 0, sortOrder, new Date().toISOString().slice(0, 10));
+  res.json({ id: info.lastInsertRowid });
+});
+
+router.patch('/ads/:id', (req, res) => {
+  const { imageUrl, linkUrl, enabled, sortOrder } = req.body || {};
+  db.prepare(
+    'UPDATE ad_banners SET image_url = COALESCE(?, image_url), link_url = COALESCE(?, link_url), enabled = COALESCE(?, enabled), sort_order = COALESCE(?, sort_order) WHERE id = ?'
+  ).run(
+    imageUrl ?? null,
+    linkUrl ?? null,
+    enabled === undefined ? null : enabled ? 1 : 0,
+    sortOrder === undefined ? null : sortOrder,
+    req.params.id
+  );
+  res.json({ ok: true });
+});
+
+router.delete('/ads/:id', (req, res) => {
+  db.prepare('DELETE FROM ad_banners WHERE id = ?').run(req.params.id);
+  res.json({ ok: true });
+});
+
 module.exports = router;
