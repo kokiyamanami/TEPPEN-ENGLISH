@@ -8,10 +8,12 @@ const crypto = require('crypto');
 const OpenAI = require('openai');
 const { toFile } = require('openai/uploads');
 const { ALL_USERS_MOCK, OTHER_GROUPS_MOCK } = require('./rankingData');
+const adminRoutes = require('./adminRoutes');
 
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '2mb' }));
+app.use('/api/admin', adminRoutes);
 
 const upload = multer({ dest: '/tmp/teppen-uploads/' });
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });

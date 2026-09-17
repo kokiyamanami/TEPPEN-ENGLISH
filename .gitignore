@@ -33,6 +33,8 @@ yarn-error.*
 # local env files
 .env*.local
 server/.env
+server/admin.sqlite
+server/admin.sqlite-*
 
 # typescript
 *.tsbuildinfo

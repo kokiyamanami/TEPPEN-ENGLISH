@@ -1,0 +1,239 @@
+const Database = require('better-sqlite3');
+const bcrypt = require('bcryptjs');
+const path = require('path');
+
+const db = new Database(path.join(__dirname, 'admin.sqlite'));
+db.pragma('journal_mode = WAL');
+
+db.exec(`
+CREATE TABLE IF NOT EXISTS admin_users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  email TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'coach',
+  notify_email INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS groups (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active'
+);
+
+CREATE TABLE IF NOT EXISTS coaches (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  email TEXT,
+  specialty TEXT
+);
+
+CREATE TABLE IF NOT EXISTS students (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  email TEXT,
+  phone TEXT,
+  group_id INTEGER REFERENCES groups(id),
+  phase INTEGER NOT NULL DEFAULT 1,
+  status TEXT NOT NULL DEFAULT 'active',
+  last_login TEXT
+);
+
+CREATE TABLE IF NOT EXISTS speaking_stats (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  student_id INTEGER REFERENCES students(id),
+  date TEXT NOT NULL,
+  study_min INTEGER NOT NULL,
+  speak_min INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS monthly_mission_results (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  student_id INTEGER REFERENCES students(id),
+  month TEXT NOT NULL,
+  pass INTEGER NOT NULL,
+  date TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS phase_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  student_id INTEGER REFERENCES students(id),
+  phase INTEGER NOT NULL,
+  date TEXT NOT NULL,
+  listening INTEGER,
+  accuracy INTEGER,
+  fluency INTEGER,
+  clarity INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS unit_submissions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  student_id INTEGER REFERENCES students(id),
+  unit INTEGER NOT NULL,
+  submitted_at TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending'
+);
+
+CREATE TABLE IF NOT EXISTS chat_messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  student_id INTEGER REFERENCES students(id),
+  sender TEXT NOT NULL,
+  text TEXT NOT NULL,
+  time TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS phrases (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  student_id INTEGER REFERENCES students(id),
+  text TEXT NOT NULL,
+  category TEXT
+);
+
+CREATE TABLE IF NOT EXISTS group_goals (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  group_id INTEGER REFERENCES groups(id),
+  week_start TEXT NOT NULL,
+  study_goal INTEGER,
+  speak_goal INTEGER,
+  achieved INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS materials (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  week TEXT,
+  status TEXT NOT NULL DEFAULT 'draft'
+);
+
+CREATE TABLE IF NOT EXISTS announcements (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  body TEXT,
+  target TEXT,
+  status TEXT NOT NULL DEFAULT 'draft',
+  created_at TEXT NOT NULL
+);
+`);
+
+function addDaysStr(days) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function seedIfEmpty() {
+  const studentCount = db.prepare('SELECT COUNT(*) as c FROM students').get().c;
+  if (studentCount > 0) return;
+
+  console.log('Seeding admin database with mock data...');
+
+  const insertGroup = db.prepare('INSERT INTO groups (name, status) VALUES (?, ?)');
+  const groupNames = ['aグループ', 'bグループ', 'cグループ', 'dグループ', 'eグループ'];
+  const groupIds = groupNames.map((name, i) => insertGroup.run(name, i === 4 ? 'inactive' : 'active').lastInsertRowid);
+
+  const insertCoach = db.prepare('INSERT INTO coaches (name, email, specialty) VALUES (?, ?, ?)');
+  insertCoach.run('田中コーチ', 'tanaka@teppen-english.com', 'ビジネス英語・プレゼンテーション');
+  insertCoach.run('佐藤チューター', 'sato@teppen-english.com', '発音・イントネーション');
+
+  const studentNames = [
+    '鈴木 花子', '高橋 修', '田村 美咲', '伊藤 大輔', '渡辺 亜美',
+    '中村 早紀', '小林 陽介', '吉田 蓮', '山本 直樹', '加藤 沙織',
+    '斎藤 拓也', '清水 美咲', '井上 大和', '木村 遥', '林 健二',
+    '橋本 彩', '近藤 亮', '石田 優子', '村上 隼人', '原田 千尋',
+    '松田 亮太', '藤田 恵', '岡田 翔', '西村 麻衣', '後藤 太一',
+  ];
+
+  const insertStudent = db.prepare(
+    'INSERT INTO students (name, email, phone, group_id, phase, status, last_login) VALUES (?, ?, ?, ?, ?, ?, ?)'
+  );
+  const insertStat = db.prepare('INSERT INTO speaking_stats (student_id, date, study_min, speak_min) VALUES (?, ?, ?, ?)');
+  const insertMonthly = db.prepare('INSERT INTO monthly_mission_results (student_id, month, pass, date) VALUES (?, ?, ?, ?)');
+  const insertPhaseHist = db.prepare(
+    'INSERT INTO phase_history (student_id, phase, date, listening, accuracy, fluency, clarity) VALUES (?, ?, ?, ?, ?, ?, ?)'
+  );
+  const insertPhrase = db.prepare('INSERT INTO phrases (student_id, text, category) VALUES (?, ?, ?)');
+  const insertChat = db.prepare('INSERT INTO chat_messages (student_id, sender, text, time) VALUES (?, ?, ?, ?)');
+  const insertUnit = db.prepare('INSERT INTO unit_submissions (student_id, unit, submitted_at, status) VALUES (?, ?, ?, ?)');
+
+  studentNames.forEach((name, i) => {
+    const groupId = groupIds[i % 4]; // 最初の4グループに分散、5つ目(非アクティブ)には所属させない
+    const phase = 1 + (i % 5);
+    const status = i % 11 === 0 ? 'inactive' : 'active';
+    const lastLogin = addDaysStr(-(i % 6));
+    const studentId = insertStudent.run(name, `student${i + 1}@example.com`, `090-0000-${String(1000 + i)}`, groupId, phase, status, lastLogin)
+      .lastInsertRowid;
+
+    for (let d = 29; d >= 0; d--) {
+      const study = Math.round(50 + Math.random() * 60);
+      const speak = Math.round(study * (0.25 + Math.random() * 0.2));
+      insertStat.run(studentId, addDaysStr(-d), study, speak);
+    }
+
+    for (let m = 3; m >= 0; m--) {
+      const dt = new Date();
+      dt.setMonth(dt.getMonth() - m, 1);
+      insertMonthly.run(studentId, dt.toISOString().slice(0, 7), Math.random() > 0.25 ? 1 : 0, dt.toISOString().slice(0, 10));
+    }
+
+    insertPhaseHist.run(
+      studentId,
+      phase,
+      addDaysStr(-30),
+      2 + Math.floor(Math.random() * 3),
+      2 + Math.floor(Math.random() * 3),
+      2 + Math.floor(Math.random() * 3),
+      2 + Math.floor(Math.random() * 3)
+    );
+
+    if (i % 3 === 0) {
+      insertPhrase.run(studentId, 'Let me walk you through the numbers.', '重要構文40');
+      insertPhrase.run(studentId, 'Could you elaborate on that?', 'お役立ちフレーズ50');
+    }
+
+    insertChat.run(studentId, 'coach', 'MYピッチの提出お待ちしています。準備で困っていることがあればどうぞ。', addDaysStr(-1));
+    if (i % 2 === 0) {
+      insertChat.run(studentId, 'student', 'ありがとうございます、今週中に提出します！', addDaysStr(-1));
+    }
+
+    if (i % 4 === 0) {
+      insertUnit.run(studentId, phase * 2, addDaysStr(-1), 'pending');
+    }
+  });
+
+  const insertGoal = db.prepare('INSERT INTO group_goals (group_id, week_start, study_goal, speak_goal, achieved) VALUES (?, ?, ?, ?, ?)');
+  groupIds.slice(0, 4).forEach((groupId) => {
+    for (let w = 3; w >= 0; w--) {
+      insertGoal.run(groupId, addDaysStr(-w * 7 - 7), 90, 30, Math.random() > 0.3 ? 1 : 0);
+    }
+  });
+
+  const insertMaterial = db.prepare('INSERT INTO materials (title, week, status) VALUES (?, ?, ?)');
+  insertMaterial.run('強み・弱み・キャリアについて話す', 'WEEK 14', 'published');
+  insertMaterial.run('商談での価格交渉', 'WEEK 15', 'draft');
+  insertMaterial.run('プロジェクトの進捗報告', 'WEEK 13', 'published');
+
+  const insertAnnouncement = db.prepare('INSERT INTO announcements (title, body, target, status, created_at) VALUES (?, ?, ?, ?, ?)');
+  insertAnnouncement.run(
+    'フリー練習に「シャドーイング」を追加しました',
+    '9/1よりフリー練習に「シャドーイング」カテゴリを追加しました。',
+    '全生徒',
+    'published',
+    addDaysStr(-2)
+  );
+  insertAnnouncement.run(
+    'Monthlyミッション提出期限のお知らせ',
+    '来週のMonthlyミッション提出期限は月曜23:59までです。',
+    '全生徒',
+    'draft',
+    addDaysStr(0)
+  );
+
+  const insertAdmin = db.prepare('INSERT INTO admin_users (name, email, password_hash, role, notify_email) VALUES (?, ?, ?, ?, ?)');
+  insertAdmin.run('田中コーチ', 'coach@teppen-english.com', bcrypt.hashSync('teppen2026', 10), 'admin', 1);
+
+  console.log('Seed complete.');
+}
+
+seedIfEmpty();
+
+module.exports = db;
