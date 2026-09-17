@@ -6,11 +6,11 @@ export type Profile = {
   gender: string;
   age: string;
   voiceGender: string;
-  job: string;
-  position: string;
+  job: string[];
+  position: string[];
   jobDetail: string;
   personality: string;
-  hobby: string;
+  hobby: string[];
   career: string;
   successStory: string;
   strengths: string;
@@ -24,11 +24,11 @@ export const emptyProfile: Profile = {
   gender: '',
   age: '',
   voiceGender: '',
-  job: '',
-  position: '',
+  job: [],
+  position: [],
   jobDetail: '',
   personality: '',
-  hobby: '',
+  hobby: [],
   career: '',
   successStory: '',
   strengths: '',
@@ -39,7 +39,7 @@ export const emptyProfile: Profile = {
 
 type ProfileContextValue = {
   profile: Profile;
-  setField: (field: keyof Profile, value: string) => void;
+  setField: <K extends keyof Profile>(field: K, value: Profile[K]) => void;
   loadProfile: () => Promise<void>;
   saveProfile: () => Promise<void>;
 };
@@ -49,7 +49,7 @@ const ProfileContext = createContext<ProfileContextValue | null>(null);
 export function ProfileProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile>(emptyProfile);
 
-  const setField = (field: keyof Profile, value: string) => {
+  const setField = <K extends keyof Profile>(field: K, value: Profile[K]) => {
     setProfile((prev) => ({ ...prev, [field]: value }));
   };
 

@@ -1,25 +1,37 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { AudioModule } from 'expo-audio';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { OnboardProgress } from '../src/components/OnboardProgress';
 import { TOTAL_OB_STEPS } from '../src/data/onboarding';
 import { colors, radius, spacing } from '../src/theme/colors';
 
 // screen key: obperm
-// TODO(Phase10): expo-av / expo-audio の実パーミッションAPIに置き換え
+// マイクは実際のOS許可を取得し、両方の許可が揃うまで次へ進めない
 export default function ObPermScreen() {
   const [micGranted, setMicGranted] = useState(false);
   const [speakerGranted, setSpeakerGranted] = useState(false);
+  const canProceed = micGranted && speakerGranted;
+
+  const requestMic = async () => {
+    const { granted } = await AudioModule.requestRecordingPermissionsAsync();
+    if (granted) {
+      setMicGranted(true);
+    } else {
+      Alert.alert(
+        'マイクへのアクセスが必要です',
+        '発話課題の録音にマイクを使用します。端末の設定からマイクへのアクセスを許可してください。'
+      );
+    }
+  };
 
   return (
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content}>
         <OnboardProgress stepNumber={TOTAL_OB_STEPS} />
         <Text style={styles.title}>マイクとスピーカーを許可</Text>
-        <Text style={styles.sub}>
-          発話課題の録音と、お手本音声の再生に使います。後から端末の設定でも変更できます。
-        </Text>
+        <Text style={styles.sub}>発話課題の録音と、お手本音声の再生に使うため、両方の許可が必要です。</Text>
 
         <View style={styles.card}>
           <PermRow
@@ -27,7 +39,7 @@ export default function ObPermScreen() {
             title="マイク"
             desc="発話課題・フリー練習の録音に使用"
             granted={micGranted}
-            onPress={() => setMicGranted(true)}
+            onPress={requestMic}
           />
           <View style={styles.divider} />
           <PermRow
@@ -38,13 +50,19 @@ export default function ObPermScreen() {
             onPress={() => setSpeakerGranted(true)}
           />
         </View>
+
+        {!canProceed && <Text style={styles.hint}>両方を許可すると次へ進めます</Text>}
       </ScrollView>
 
       <View style={styles.footer}>
         <Pressable style={styles.backBtn} onPress={() => router.push('/ob5')}>
           <Text style={styles.backText}>戻る</Text>
         </Pressable>
-        <Pressable style={styles.nextBtn} onPress={() => router.push('/obdone')}>
+        <Pressable
+          style={[styles.nextBtn, !canProceed && styles.nextBtnDisabled]}
+          onPress={() => router.push('/obdone')}
+          disabled={!canProceed}
+        >
           <Text style={styles.nextText}>次へ</Text>
         </Pressable>
       </View>
@@ -103,6 +121,7 @@ const styles = StyleSheet.create({
   permBtnOn: { backgroundColor: colors.navy, borderColor: colors.navy },
   permBtnText: { color: colors.coral, fontSize: 12, fontWeight: '600' },
   permBtnTextOn: { color: colors.white },
+  hint: { fontSize: 11, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.md },
   footer: {
     flexDirection: 'row',
     gap: spacing.sm,
@@ -115,5 +134,6 @@ const styles = StyleSheet.create({
   backBtn: { width: 84, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border },
   backText: { color: colors.textPrimary, fontWeight: '600' },
   nextBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: spacing.md, borderRadius: radius.pill, backgroundColor: colors.coral },
+  nextBtnDisabled: { backgroundColor: colors.border },
   nextText: { color: colors.white, fontWeight: '700' },
 });

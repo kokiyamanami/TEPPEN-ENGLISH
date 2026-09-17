@@ -15,7 +15,6 @@ const FIELD_ROWS: { key: keyof ReturnType<typeof useProfile>['profile']; label: 
   { key: 'voiceGender', label: '音声性別' },
   { key: 'jobDetail', label: '職業詳細' },
   { key: 'personality', label: '性格' },
-  { key: 'hobby', label: '趣味' },
   { key: 'career', label: '経歴' },
   { key: 'successStory', label: '成功体験' },
   { key: 'strengths', label: '強み・弱み' },
@@ -49,9 +48,11 @@ export default function MyPageScreen() {
         </Pressable>
       </View>
       <View style={styles.fieldGroup}>
-        <FieldRow label="職業 / 職位" value={`${profile.job || '未設定'} / ${profile.position || '未設定'}`} />
+        <FieldRow label="職業" value={profile.job.length ? profile.job.join('、') : '未設定'} />
+        <FieldRow label="職位" value={profile.position.length ? profile.position.join('、') : '未設定'} />
+        <FieldRow label="趣味" value={profile.hobby.length ? profile.hobby.join('、') : '未設定'} />
         {FIELD_ROWS.map((f) => (
-          <FieldRow key={f.key} label={f.label} value={profile[f.key] || '未設定'} />
+          <FieldRow key={f.key} label={f.label} value={(profile[f.key] as string) || '未設定'} />
         ))}
       </View>
 
