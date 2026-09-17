@@ -1,12 +1,14 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
+import { Avatar } from '../components/Avatar';
 import { Modal } from '../components/Modal';
 import { useToast } from '../context/ToastContext';
 
 type Student = {
   id: number;
   name: string;
+  avatar_url: string | null;
   group_id: number | null;
   group_name: string | null;
   status: string;
@@ -104,7 +106,11 @@ export default function Students() {
             return (
               <tr key={s.id}>
                 <td>
-                  <Link to={`/students/${s.id}`} style={{ color: 'var(--navy)', fontWeight: 600, textDecoration: 'none' }}>
+                  <Link
+                    to={`/students/${s.id}`}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--navy)', fontWeight: 600, textDecoration: 'none' }}
+                  >
+                    <Avatar url={s.avatar_url} name={s.name} size={28} />
                     {s.name}
                   </Link>
                 </td>

@@ -11,6 +11,7 @@ const MAIN_LINKS = [
 const OPS_LINKS = [
   { to: '/coaches', label: 'コーチ管理' },
   { to: '/materials', label: '教材管理' },
+  { to: '/lectures', label: '動画管理' },
   { to: '/announcements', label: 'お知らせ管理' },
   { to: '/ads', label: '広告管理' },
   { to: '/settings', label: '設定' },

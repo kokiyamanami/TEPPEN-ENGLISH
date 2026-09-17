@@ -79,3 +79,23 @@ export async function apiDelete<T>(path: string): Promise<T> {
   if (!res.ok) throw new Error(`DELETE ${path} failed (${res.status})`);
   return res.json();
 }
+
+export async function uploadAvatar(uri: string): Promise<{ avatarUrl: string }> {
+  const token = await getStoredToken();
+  const formData = new FormData();
+  const ext = uri.split('.').pop()?.toLowerCase() || 'jpg';
+  formData.append('avatar', {
+    uri,
+    name: `avatar.${ext}`,
+    type: `image/${ext === 'jpg' ? 'jpeg' : ext}`,
+  } as unknown as Blob);
+
+  // Content-Typeは指定しない: fetchがFormDataから正しいmultipart境界を自動付与する
+  const res = await fetch(`${BACKEND_URL}/api/mobile/avatar`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    body: formData,
+  });
+  if (!res.ok) throw new Error(`avatar upload failed (${res.status})`);
+  return res.json();
+}

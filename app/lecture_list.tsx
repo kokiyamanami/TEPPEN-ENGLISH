@@ -1,20 +1,29 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { TopBar } from '../src/components/TopBar';
-import { LECTURES, youtubeThumbnail } from '../src/data/lectures';
+import { youtubeThumbnail } from '../src/data/lectures';
 import { useLectures } from '../src/store/LectureContext';
 import { colors, radius, spacing } from '../src/theme/colors';
 
 // screen key: lecture_list
 export default function LectureListScreen() {
-  const { watchedIds } = useLectures();
+  const { lectures, loading, watchedIds } = useLectures();
+
+  if (loading) {
+    return (
+      <View style={styles.screen}>
+        <TopBar title="動画" backRoute="/(tabs)/home" />
+        <ActivityIndicator style={{ marginTop: spacing.xl }} color={colors.navy} />
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.screen}>
       <TopBar title="動画" backRoute="/(tabs)/home" />
       <View style={styles.card}>
-        {LECTURES.map((l, i) => {
+        {lectures.map((l, i) => {
           const watched = watchedIds.has(l.id);
           return (
             <Pressable

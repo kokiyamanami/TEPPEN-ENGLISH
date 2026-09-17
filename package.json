@@ -9,6 +9,7 @@
     "expo": "~57.0.23",
     "expo-audio": "~57.0.5",
     "expo-constants": "^57.0.18",
+    "expo-image-picker": "~57.0.18",
     "expo-linking": "^57.0.10",
     "expo-router": "^57.0.21",
     "expo-status-bar": "~57.0.1",
@@ -18,7 +19,8 @@
     "react-native-safe-area-context": "^5.9.1",
     "react-native-screens": "^4.28.0",
     "react-native-svg": "15.15.4",
-    "react-native-webview": "13.16.1"
+    "react-native-webview": "13.16.1",
+    "react-native-youtube-iframe": "^2.4.1"
   },
   "devDependencies": {
     "@expo/ngrok": "^4.1.3",

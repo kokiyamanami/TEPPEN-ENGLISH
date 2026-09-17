@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ScreenHeader } from '../../src/components/ScreenHeader';
+import { BACKEND_URL } from '../../src/config/api';
 import { MOCK_TOTAL_STUDY_MINUTES, getCurrentAltitudeM } from '../../src/data/mockHome';
 import { useProfile } from '../../src/store/ProfileContext';
 import { useSession } from '../../src/store/SessionContext';
@@ -24,7 +25,7 @@ const FIELD_ROWS: { key: keyof ReturnType<typeof useProfile>['profile']; label: 
 
 // screen key: mypage
 export default function MyPageScreen() {
-  const { profile } = useProfile();
+  const { profile, avatarUrl } = useProfile();
   const { logout } = useSession();
   const [logoutOpen, setLogoutOpen] = useState(false);
   const altitudeM = getCurrentAltitudeM(MOCK_TOTAL_STUDY_MINUTES);
@@ -34,9 +35,13 @@ export default function MyPageScreen() {
       <ScreenHeader title="マイページ" />
 
       <View style={styles.hero}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{(profile.name || 'U').charAt(0)}</Text>
-        </View>
+        {avatarUrl ? (
+          <Image source={{ uri: avatarUrl.startsWith('http') ? avatarUrl : `${BACKEND_URL}${avatarUrl}` }} style={styles.avatarImg} />
+        ) : (
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{(profile.name || 'U').charAt(0)}</Text>
+          </View>
+        )}
         <Text style={styles.heroName}>{profile.name || '名前未設定'}</Text>
         <Text style={styles.heroPhase}>PHASE 3 · 標高{altitudeM.toLocaleString()}M</Text>
       </View>
@@ -125,6 +130,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   hero: { alignItems: 'center', backgroundColor: colors.navy, marginHorizontal: spacing.lg, borderRadius: radius.lg, paddingVertical: spacing.xl },
   avatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.coral, alignItems: 'center', justifyContent: 'center' },
+  avatarImg: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.border },
   avatarText: { color: colors.white, fontSize: 22, fontWeight: '700' },
   heroName: { color: colors.white, fontSize: 16, fontWeight: '700', marginTop: spacing.sm },
   heroPhase: { color: colors.coralLight, fontSize: 11, marginTop: 2 },

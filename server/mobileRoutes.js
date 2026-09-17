@@ -1,10 +1,17 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const multer = require('multer');
+const fs = require('fs');
+const path = require('path');
 const db = require('./db');
 
 const router = express.Router();
 const JWT_SECRET = process.env.STUDENT_JWT_SECRET || 'teppen-english-student-dev-secret';
+
+const AVATAR_DIR = path.join(__dirname, 'public', 'avatars');
+fs.mkdirSync(AVATAR_DIR, { recursive: true });
+const avatarUpload = multer({ dest: '/tmp/teppen-uploads/' });
 
 const DEFAULT_OFFICIAL_FOLDERS = ['重要構文40', 'お役立ちフレーズ50'];
 
@@ -71,7 +78,29 @@ router.get('/me', (req, res) => {
     profile: { name: student.name, ...profile },
     onboardingStep: student.onboarding_step || 'ob1',
     onboardingComplete: !!student.onboarding_complete,
+    avatarUrl: student.avatar_url || '',
   });
+});
+
+// アバター画像のアップロード（プロフィール編集画面から）。管理画面の生徒詳細にも同じURLが表示される
+router.post('/avatar', avatarUpload.single('avatar'), (req, res) => {
+  const file = req.file;
+  if (!file) return res.status(400).json({ error: 'avatar file is required' });
+  const ext = (path.extname(file.originalname || '') || '.jpg').toLowerCase();
+  const safeExt = ['.jpg', '.jpeg', '.png', '.webp'].includes(ext) ? ext : '.jpg';
+  const filename = `${req.studentId}-${Date.now()}${safeExt}`;
+  const dest = path.join(AVATAR_DIR, filename);
+  fs.renameSync(file.path, dest);
+
+  const student = db.prepare('SELECT avatar_url FROM students WHERE id = ?').get(req.studentId);
+  const oldUrl = student?.avatar_url;
+  const avatarUrl = `/avatars/${filename}`;
+  db.prepare('UPDATE students SET avatar_url = ? WHERE id = ?').run(avatarUrl, req.studentId);
+
+  if (oldUrl && oldUrl.startsWith('/avatars/')) {
+    fs.unlink(path.join(__dirname, 'public', oldUrl), () => {});
+  }
+  res.json({ avatarUrl });
 });
 
 // オンボーディング各ステップの「次へ」で呼び出し、途中離脱しても再開できるようにする
@@ -98,6 +127,12 @@ router.patch('/profile', (req, res) => {
     req.studentId
   );
   res.json({ ok: true });
+});
+
+// ---- lectures（管理画面で管理する動画一覧） ----
+router.get('/lectures', (req, res) => {
+  const rows = db.prepare('SELECT id, youtube_id, title, instructor, category FROM lectures ORDER BY sort_order, id').all();
+  res.json(rows.map((r) => ({ id: String(r.id), youtubeId: r.youtube_id, title: r.title, instructor: r.instructor, category: r.category })));
 });
 
 // ---- ad banners（管理画面で自由に設定できるバナー広告） ----

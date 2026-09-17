@@ -1,17 +1,27 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { WebView } from 'react-native-webview';
+import { useCallback, useState } from 'react';
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import YoutubePlayer from 'react-native-youtube-iframe';
 import { TopBar } from '../src/components/TopBar';
-import { LECTURES } from '../src/data/lectures';
 import { useLectures } from '../src/store/LectureContext';
 import { colors, radius, spacing } from '../src/theme/colors';
 
 // screen key: lecture_player
 export default function LecturePlayerScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
-  const lecture = LECTURES.find((l) => l.id === id);
-  const { watchedIds, markWatched } = useLectures();
+  const { lectures, watchedIds, markWatched } = useLectures();
+  const lecture = lectures.find((l) => l.id === id);
+  const { width } = useWindowDimensions();
+  const [playing, setPlaying] = useState(false);
+
+  const onChangeState = useCallback(
+    (state: string) => {
+      if (state === 'playing') setPlaying(true);
+      if (state === 'ended' && lecture) markWatched(lecture.id);
+    },
+    [lecture, markWatched]
+  );
 
   if (!lecture) {
     return (
@@ -28,12 +38,13 @@ export default function LecturePlayerScreen() {
     <View style={styles.screen}>
       <TopBar title="動画" backRoute="/lecture_list" />
       <View style={styles.video}>
-        <WebView
-          source={{ uri: `https://www.youtube.com/embed/${lecture.youtubeId}?playsinline=1` }}
-          allowsFullscreenVideo
-          allowsInlineMediaPlayback
-          mediaPlaybackRequiresUserAction={false}
-          style={styles.webview}
+        <YoutubePlayer
+          height={width * (9 / 16)}
+          width={width}
+          videoId={lecture.youtubeId}
+          play={playing}
+          onChangeState={onChangeState}
+          webViewProps={{ allowsFullscreenVideo: true }}
         />
       </View>
       <View style={styles.info}>
@@ -55,8 +66,7 @@ export default function LecturePlayerScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  video: { width: '100%', aspectRatio: 16 / 9, backgroundColor: '#000' },
-  webview: { flex: 1, backgroundColor: '#000' },
+  video: { width: '100%', backgroundColor: '#000' },
   info: { padding: spacing.lg },
   tag: { fontSize: 10, color: colors.textSecondary, backgroundColor: colors.white, alignSelf: 'flex-start', paddingHorizontal: spacing.xs, paddingVertical: 2, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.border },
   title: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.sm },

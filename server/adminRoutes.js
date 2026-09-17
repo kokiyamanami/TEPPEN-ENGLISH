@@ -87,7 +87,7 @@ router.get('/overview', (req, res) => {
 // ---- students ----
 router.get('/students', (req, res) => {
   const { search = '', groupId = '', status = '' } = req.query;
-  let sql = `SELECT s.id, s.name, s.email, s.phone, s.group_id, s.phase, s.status, s.last_login, g.name as group_name FROM students s LEFT JOIN groups g ON g.id = s.group_id WHERE 1=1`;
+  let sql = `SELECT s.id, s.name, s.email, s.phone, s.group_id, s.phase, s.status, s.last_login, s.avatar_url, g.name as group_name FROM students s LEFT JOIN groups g ON g.id = s.group_id WHERE 1=1`;
   const params = [];
   if (search) {
     sql += ` AND s.name LIKE ?`;
@@ -139,7 +139,7 @@ router.patch('/students/:id', (req, res) => {
 
 router.get('/students/:id', (req, res) => {
   const student = db
-    .prepare(`SELECT s.id, s.name, s.email, s.phone, s.group_id, s.phase, s.status, s.last_login, g.name as group_name FROM students s LEFT JOIN groups g ON g.id = s.group_id WHERE s.id = ?`)
+    .prepare(`SELECT s.id, s.name, s.email, s.phone, s.group_id, s.phase, s.status, s.last_login, s.avatar_url, g.name as group_name FROM students s LEFT JOIN groups g ON g.id = s.group_id WHERE s.id = ?`)
     .get(req.params.id);
   if (!student) return res.status(404).json({ error: 'not_found' });
 
@@ -326,6 +326,36 @@ router.patch('/announcements/:id', (req, res) => {
   db.prepare(
     'UPDATE announcements SET status = COALESCE(?, status), title = COALESCE(?, title), body = COALESCE(?, body) WHERE id = ?'
   ).run(status ?? null, title ?? null, body ?? null, req.params.id);
+  res.json({ ok: true });
+});
+
+// ---- lectures（モバイルアプリの「動画」カテゴリで配信するYouTube動画） ----
+router.get('/lectures', (req, res) => {
+  res.json(db.prepare('SELECT * FROM lectures ORDER BY sort_order, id').all());
+});
+
+router.post('/lectures', (req, res) => {
+  const { youtubeId, title, instructor = '', category = '', sortOrder = 0 } = req.body || {};
+  if (!youtubeId || !title) return res.status(400).json({ error: 'youtubeId and title are required' });
+  const info = db
+    .prepare('INSERT INTO lectures (youtube_id, title, instructor, category, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(youtubeId, title, instructor, category, sortOrder, new Date().toISOString().slice(0, 10));
+  res.json({ id: info.lastInsertRowid });
+});
+
+router.patch('/lectures/:id', (req, res) => {
+  const { youtubeId, title, instructor, category, sortOrder } = req.body || {};
+  db.prepare(
+    `UPDATE lectures SET
+      youtube_id = COALESCE(?, youtube_id), title = COALESCE(?, title), instructor = COALESCE(?, instructor),
+      category = COALESCE(?, category), sort_order = COALESCE(?, sort_order)
+     WHERE id = ?`
+  ).run(youtubeId ?? null, title ?? null, instructor ?? null, category ?? null, sortOrder === undefined ? null : sortOrder, req.params.id);
+  res.json({ ok: true });
+});
+
+router.delete('/lectures/:id', (req, res) => {
+  db.prepare('DELETE FROM lectures WHERE id = ?').run(req.params.id);
   res.json({ ok: true });
 });
 

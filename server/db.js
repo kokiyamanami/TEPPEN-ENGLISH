@@ -40,7 +40,8 @@ CREATE TABLE IF NOT EXISTS students (
   status TEXT NOT NULL DEFAULT 'active',
   last_login TEXT,
   onboarding_step TEXT NOT NULL DEFAULT 'ob1',
-  onboarding_complete INTEGER NOT NULL DEFAULT 0
+  onboarding_complete INTEGER NOT NULL DEFAULT 0,
+  avatar_url TEXT
 );
 
 CREATE TABLE IF NOT EXISTS speaking_stats (
@@ -131,6 +132,16 @@ CREATE TABLE IF NOT EXISTS announcements (
   created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS lectures (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  youtube_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  instructor TEXT,
+  category TEXT,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS ad_banners (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   image_url TEXT NOT NULL,
@@ -148,6 +159,9 @@ if (!studentCols.includes('onboarding_step')) {
 }
 if (!studentCols.includes('onboarding_complete')) {
   db.exec('ALTER TABLE students ADD COLUMN onboarding_complete INTEGER NOT NULL DEFAULT 0');
+}
+if (!studentCols.includes('avatar_url')) {
+  db.exec('ALTER TABLE students ADD COLUMN avatar_url TEXT');
 }
 
 function addDaysStr(days) {
@@ -269,6 +283,20 @@ function seedIfEmpty() {
 
   const insertAdmin = db.prepare('INSERT INTO admin_users (name, email, password_hash, role, notify_email) VALUES (?, ?, ?, ?, ?)');
   insertAdmin.run('田中コーチ', 'coach@teppen-english.com', bcrypt.hashSync('teppen2026', 10), 'admin', 1);
+
+  const insertLecture = db.prepare(
+    'INSERT INTO lectures (youtube_id, title, instructor, category, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+  );
+  const seedLectures = [
+    ['HXH-qL4DltE', 'TOEIC700～800点でも話せない理由と仕事で使える英語へのロードマップ', 'TEPPEN ENGLISH', '学習法'],
+    ['JYZVWfsASeU', '英語は何時間勉強すれば話せる？本当に大切なのは時間ではありません', 'TEPPEN ENGLISH', '学習法'],
+    ['Ae0dyicbGsw', 'ビジネス英語とは？本当に必要なレベルを解説します', 'TEPPEN ENGLISH', 'ビジネス英語'],
+    ['7ld-qzNW_-s', '「I think…」ばかりになっていませんか？同じ表現の繰り返しから抜け出す方法', 'TEPPEN ENGLISH', 'スピーキング'],
+    ['mONOTQydDDw', '通勤時間だけで英語が話せるようになる「独り言英語」', 'TEPPEN ENGLISH', 'スピーキング'],
+  ];
+  seedLectures.forEach(([youtubeId, title, instructor, category], i) => {
+    insertLecture.run(youtubeId, title, instructor, category, i, new Date().toISOString().slice(0, 10));
+  });
 
   const insertAd = db.prepare('INSERT INTO ad_banners (image_url, link_url, enabled, sort_order, created_at) VALUES (?, ?, ?, ?, ?)');
   insertAd.run(

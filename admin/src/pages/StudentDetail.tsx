@@ -1,11 +1,21 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../api/client';
+import { Avatar } from '../components/Avatar';
 import { Modal } from '../components/Modal';
 import { useToast } from '../context/ToastContext';
 
 type StudentDetailData = {
-  student: { id: number; name: string; email: string; phone: string; group_name: string | null; phase: number; status: string };
+  student: {
+    id: number;
+    name: string;
+    email: string;
+    phone: string;
+    avatar_url: string | null;
+    group_name: string | null;
+    phase: number;
+    status: string;
+  };
   speakingStats: { date: string; study_min: number; speak_min: number }[];
   monthlyMissions: { id: number; month: string; pass: number; date: string }[];
   phaseHistory: { id: number; phase: number; date: string; listening: number; accuracy: number; fluency: number; clarity: number }[];
@@ -76,7 +86,10 @@ export default function StudentDetail() {
       <div className="breadcrumb">
         <Link to="/students">生徒一覧</Link> › {student.name}
       </div>
-      <h1 className="page-title">{student.name}</h1>
+      <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <Avatar url={student.avatar_url} name={student.name} size={40} />
+        {student.name}
+      </h1>
 
       <div className="grid-2">
         {/* Phase履歴 */}

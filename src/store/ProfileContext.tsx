@@ -1,5 +1,5 @@
 import { createContext, ReactNode, useContext, useState } from 'react';
-import { apiGet, apiPatch, apiPost } from '../api/mobileAuth';
+import { apiGet, apiPatch, apiPost, uploadAvatar as uploadAvatarRequest } from '../api/mobileAuth';
 
 export type Profile = {
   name: string;
@@ -37,21 +37,24 @@ export const emptyProfile: Profile = {
   termGoal: '',
 };
 
-type MeResponse = { profile: Partial<Profile>; onboardingStep: string; onboardingComplete: boolean };
+type MeResponse = { profile: Partial<Profile>; onboardingStep: string; onboardingComplete: boolean; avatarUrl: string };
 
 type ProfileContextValue = {
   profile: Profile;
+  avatarUrl: string;
   setField: <K extends keyof Profile>(field: K, value: Profile[K]) => void;
   loadProfile: () => Promise<{ onboardingStep: string; onboardingComplete: boolean }>;
   saveProfile: () => Promise<void>;
   saveOnboardingProgress: (step: string) => Promise<void>;
   completeOnboarding: () => Promise<void>;
+  uploadAvatar: (uri: string) => Promise<void>;
 };
 
 const ProfileContext = createContext<ProfileContextValue | null>(null);
 
 export function ProfileProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile>(emptyProfile);
+  const [avatarUrl, setAvatarUrl] = useState('');
 
   const setField = <K extends keyof Profile>(field: K, value: Profile[K]) => {
     setProfile((prev) => ({ ...prev, [field]: value }));
@@ -61,7 +64,13 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const loadProfile = async () => {
     const res = await apiGet<MeResponse>('/me');
     setProfile((prev) => ({ ...prev, ...res.profile }));
+    setAvatarUrl(res.avatarUrl || '');
     return { onboardingStep: res.onboardingStep, onboardingComplete: res.onboardingComplete };
+  };
+
+  const uploadAvatar = async (uri: string) => {
+    const res = await uploadAvatarRequest(uri);
+    setAvatarUrl(res.avatarUrl);
   };
 
   // オンボーディング完了時・プロフィール編集保存時にサーバーへ反映
@@ -79,7 +88,9 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <ProfileContext.Provider value={{ profile, setField, loadProfile, saveProfile, saveOnboardingProgress, completeOnboarding }}>
+    <ProfileContext.Provider
+      value={{ profile, avatarUrl, setField, loadProfile, saveProfile, saveOnboardingProgress, completeOnboarding, uploadAvatar }}
+    >
       {children}
     </ProfileContext.Provider>
   );

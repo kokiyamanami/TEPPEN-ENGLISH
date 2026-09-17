@@ -7,6 +7,7 @@ import Announcements from './pages/Announcements';
 import Coaches from './pages/Coaches';
 import GroupDetail from './pages/GroupDetail';
 import Groups from './pages/Groups';
+import Lectures from './pages/Lectures';
 import Login from './pages/Login';
 import Materials from './pages/Materials';
 import Overview from './pages/Overview';
@@ -98,6 +99,14 @@ export default function App() {
               element={
                 <RequireAuth>
                   <Announcements />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/lectures"
+              element={
+                <RequireAuth>
+                  <Lectures />
                 </RequireAuth>
               }
             />

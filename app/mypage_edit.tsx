@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { AvatarPicker } from '../src/components/AvatarPicker';
 import { OnboardFieldInput } from '../src/components/OnboardFieldInput';
 import { TopBar } from '../src/components/TopBar';
 import { onboardSteps } from '../src/data/onboarding';
@@ -25,6 +26,10 @@ export default function MyPageEditScreen() {
   return (
     <ScrollView style={styles.screen}>
       <TopBar title="プロフィール編集" backRoute="/(tabs)/mypage" />
+      <View style={styles.avatarWrap}>
+        <AvatarPicker size={88} />
+        <Text style={styles.avatarHint}>タップして写真を変更</Text>
+      </View>
       {onboardSteps.map((step) => (
         <View key={step.key}>
           <Text style={styles.sectionTitle}>{step.title}</Text>
@@ -42,6 +47,8 @@ export default function MyPageEditScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
+  avatarWrap: { alignItems: 'center', marginTop: spacing.lg },
+  avatarHint: { fontSize: 11, color: colors.textSecondary, marginTop: spacing.sm },
   sectionTitle: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, marginHorizontal: spacing.lg, marginTop: spacing.lg, marginBottom: spacing.xs },
   saveBtn: { backgroundColor: colors.coral, borderRadius: radius.pill, marginHorizontal: spacing.lg, marginVertical: spacing.xl, paddingVertical: spacing.md, alignItems: 'center' },
   saveBtnText: { color: colors.white, fontWeight: '700' },

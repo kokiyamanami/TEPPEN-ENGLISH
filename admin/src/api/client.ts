@@ -1,4 +1,4 @@
-const BACKEND_URL = 'http://35.72.165.240:4000';
+export const BACKEND_URL = 'http://35.72.165.240:4000';
 
 function getToken() {
   return localStorage.getItem('admin_token');
