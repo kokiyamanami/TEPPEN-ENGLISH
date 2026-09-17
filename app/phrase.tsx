@@ -1,13 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TopBar } from '../src/components/TopBar';
 import { usePhrases } from '../src/store/PhraseContext';
 import { colors, radius, spacing } from '../src/theme/colors';
 
 // screen key: phrase
 export default function PhraseScreen() {
+  const insets = useSafeAreaInsets();
   const { folders, folderCount, addFolder, deleteFolder, openRegister } = usePhrases();
   const [showAddFolder, setShowAddFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
@@ -55,8 +57,8 @@ export default function PhraseScreen() {
       </View>
 
       <Modal visible={showAddFolder} transparent animationType="slide" onRequestClose={() => setShowAddFolder(false)}>
-        <View style={styles.overlay}>
-          <View style={styles.sheet}>
+        <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={[styles.sheet, { paddingTop: insets.top + spacing.lg }]}>
             <Text style={styles.sheetTitle}>新しいカテゴリを追加</Text>
             <Text style={styles.sheetDesc}>フレーズを整理するための、あなた専用のカテゴリです</Text>
             <TextInput
@@ -75,12 +77,12 @@ export default function PhraseScreen() {
               </Pressable>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Modal visible={!!deleteTarget} transparent animationType="fade" onRequestClose={() => setDeleteTarget(null)}>
         <View style={styles.overlay}>
-          <View style={styles.sheet}>
+          <View style={[styles.sheet, { paddingTop: insets.top + spacing.lg }]}>
             <Text style={styles.sheetTitle}>このカテゴリを削除しますか？</Text>
             <Text style={styles.sheetDesc}>中のフレーズもまとめて削除されます。この操作は元に戻せません。</Text>
             <View style={styles.sheetRow}>
@@ -125,8 +127,8 @@ const styles = StyleSheet.create({
   badge: { fontSize: 11, color: colors.textSecondary },
   folderTitle: { fontSize: 13, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.xs },
   folderSub: { fontSize: 10, color: colors.textSecondary, marginTop: 2 },
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: colors.white, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, padding: spacing.lg },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-start' },
+  sheet: { backgroundColor: colors.white, borderBottomLeftRadius: radius.lg, borderBottomRightRadius: radius.lg, padding: spacing.lg },
   sheetTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
   sheetDesc: { fontSize: 12, color: colors.textSecondary, marginTop: spacing.xs, lineHeight: 18 },
   input: { marginTop: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontSize: 13, color: colors.textPrimary },

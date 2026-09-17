@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Image, Linking, Pressable, StyleSheet } from 'react-native';
 import { apiGet } from '../api/mobileAuth';
 import { BACKEND_URL } from '../config/api';
+import { useLiveRefresh } from '../hooks/useLiveRefresh';
 import { radius, spacing } from '../theme/colors';
 
 type AdBannerData = { id: number; imageUrl: string; linkUrl: string };
@@ -17,11 +18,14 @@ export function AdBanner({ placement = 'home' }: { placement?: 'home' | 'talk' |
   const [ads, setAds] = useState<AdBannerData[]>([]);
   const [index, setIndex] = useState(0);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     apiGet<AdBannerData[]>(`/ad-banners?placement=${placement}`)
       .then(setAds)
       .catch(() => setAds([]));
   }, [placement]);
+
+  useEffect(load, [load]);
+  useLiveRefresh(load);
 
   useEffect(() => {
     if (ads.length < 2) return;

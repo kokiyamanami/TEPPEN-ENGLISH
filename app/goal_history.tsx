@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TopBar } from '../src/components/TopBar';
 import { CURRENT_TERM_LABEL } from '../src/data/goals';
 import { useGoals } from '../src/store/GoalsContext';
@@ -9,6 +10,7 @@ import { colors, radius, spacing } from '../src/theme/colors';
 
 // screen key: goal_history
 export default function GoalHistoryScreen() {
+  const insets = useSafeAreaInsets();
   const { studyGoal, speakGoal, setDailyGoals, termGoalHistory, addTermGoal } = useGoals();
   const { setField } = useProfile();
   const [studyInput, setStudyInput] = useState(String(studyGoal));
@@ -62,8 +64,8 @@ export default function GoalHistoryScreen() {
       </View>
 
       <Modal visible={showNewGoal} transparent animationType="slide" onRequestClose={() => setShowNewGoal(false)}>
-        <View style={styles.overlay}>
-          <View style={styles.sheet}>
+        <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={[styles.sheet, { paddingTop: insets.top + spacing.lg }]}>
             <Text style={styles.sheetTitle}>新しい目標を設定</Text>
             <Text style={styles.sheetDesc}>現在のターム（{CURRENT_TERM_LABEL}）の目標として登録されます</Text>
             <TextInput
@@ -83,7 +85,7 @@ export default function GoalHistoryScreen() {
               </Pressable>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </ScrollView>
   );
@@ -106,8 +108,8 @@ const styles = StyleSheet.create({
   youTag: { fontSize: 10, color: colors.coral, fontWeight: '700' },
   histGoal: { fontSize: 13, color: colors.textPrimary, fontWeight: '600', marginTop: 4 },
   histDate: { fontSize: 10, color: colors.textSecondary, marginTop: 2 },
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: colors.white, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, padding: spacing.lg },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-start' },
+  sheet: { backgroundColor: colors.white, borderBottomLeftRadius: radius.lg, borderBottomRightRadius: radius.lg, padding: spacing.lg },
   sheetTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
   sheetDesc: { fontSize: 12, color: colors.textSecondary, marginTop: spacing.xs },
   textarea: { marginTop: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, padding: spacing.sm, minHeight: 70, fontSize: 13, color: colors.textPrimary, textAlignVertical: 'top' },

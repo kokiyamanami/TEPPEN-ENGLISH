@@ -16,6 +16,26 @@ function thumbnailUrl(youtubeId: string) {
   return `https://i.ytimg.com/vi/${youtubeId}/hqdefault.jpg`;
 }
 
+// youtube.com/watch?v=ID・youtu.be/ID・shorts/ID等のURL、または動画IDそのものの入力を許容する
+function extractYoutubeId(input: string): string {
+  const trimmed = input.trim();
+  try {
+    const url = new URL(trimmed);
+    if (url.hostname.includes('youtu.be')) {
+      return url.pathname.split('/').filter(Boolean)[0] || trimmed;
+    }
+    if (url.hostname.includes('youtube.com')) {
+      const v = url.searchParams.get('v');
+      if (v) return v;
+      const match = url.pathname.match(/\/(embed|shorts)\/([^/?]+)/);
+      if (match) return match[2];
+    }
+  } catch {
+    // URLとして解釈できない場合はIDそのものとして扱う
+  }
+  return trimmed;
+}
+
 export default function Lectures() {
   const toast = useToast();
   const [lectures, setLectures] = useState<Lecture[]>([]);
@@ -53,7 +73,7 @@ export default function Lectures() {
   const save = async (e: FormEvent) => {
     e.preventDefault();
     if (!youtubeId.trim() || !title.trim()) return;
-    const payload = { youtubeId: youtubeId.trim(), title: title.trim(), instructor, category, sortOrder: Number(sortOrder) || 0 };
+    const payload = { youtubeId: extractYoutubeId(youtubeId), title: title.trim(), instructor, category, sortOrder: Number(sortOrder) || 0 };
     if (showEdit === 'new') {
       await api.post('/lectures', payload);
       toast('動画を追加しました');
@@ -121,13 +141,13 @@ export default function Lectures() {
         <Modal onClose={() => setShowEdit(null)}>
           <form onSubmit={save}>
             <div className="modal-title">{showEdit === 'new' ? '動画を追加' : '動画を編集'}</div>
-            <label className="field-label">YouTube動画ID</label>
+            <label className="field-label">YouTube動画URL（またはID）</label>
             <input
               className="input"
               style={{ width: '100%' }}
               value={youtubeId}
               onChange={(e) => setYoutubeId(e.target.value)}
-              placeholder="例: HXH-qL4DltE"
+              placeholder="例: https://www.youtube.com/watch?v=HXH-qL4DltE"
               required
             />
             <label className="field-label">タイトル</label>

@@ -15,15 +15,24 @@ type AdBanner = {
 };
 
 const PLACEMENT_LABEL: Record<Placement, string> = { home: 'トレーニング（ホーム）', talk: 'トーク', mypage: 'マイページ' };
+const PLACEMENT_DESC: Record<Placement, string> = {
+  home: 'Userアプリ下部タブ「トレーニング」の、標高カードの下に表示されます',
+  talk: 'Userアプリ下部タブ「トーク」の、スレッド一覧の上部に表示されます',
+  mypage: 'Userアプリ下部タブ「マイページ」の、プロフィール欄の下に表示されます',
+};
+const PLACEMENT_FILTERS: (Placement | 'all')[] = ['all', 'home', 'talk', 'mypage'];
 
 export default function AdBanners() {
   const toast = useToast();
   const [ads, setAds] = useState<AdBanner[]>([]);
+  const [filter, setFilter] = useState<Placement | 'all'>('all');
   const [showCreate, setShowCreate] = useState(false);
   const [imageUrl, setImageUrl] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
   const [placement, setPlacement] = useState<Placement>('home');
   const [sortOrder, setSortOrder] = useState('0');
+
+  const visibleAds = filter === 'all' ? ads : ads.filter((a) => a.placement === filter);
 
   const load = () => api.get<AdBanner[]>('/ads').then(setAds);
 
@@ -74,12 +83,26 @@ export default function AdBanners() {
       <h1 className="page-title">広告管理</h1>
       <p style={{ color: 'var(--text-secondary, #666)', marginTop: -8, marginBottom: 16 }}>
         Userアプリの各画面に表示するバナー広告です。表示先ごとに、有効なものが複数あれば自動でローテーション表示されます。
+        編集後はUserアプリを開き直すかしばらく待つと反映されます（最大20秒ほどで自動更新）。
       </p>
       <div className="filter-row">
+        {PLACEMENT_FILTERS.map((p) => (
+          <button
+            key={p}
+            className="btn"
+            style={filter === p ? { background: 'var(--navy, #00375D)', color: '#fff', borderColor: 'var(--navy, #00375D)' } : undefined}
+            onClick={() => setFilter(p)}
+          >
+            {p === 'all' ? 'すべて' : PLACEMENT_LABEL[p]}
+          </button>
+        ))}
         <button className="btn btn-primary" style={{ marginLeft: 'auto' }} onClick={() => setShowCreate(true)}>
           ＋ バナーを追加
         </button>
       </div>
+      {filter !== 'all' && (
+        <p style={{ color: 'var(--text-secondary, #666)', fontSize: 13, marginTop: -4, marginBottom: 12 }}>{PLACEMENT_DESC[filter]}</p>
+      )}
       <table className="table">
         <thead>
           <tr>
@@ -92,7 +115,7 @@ export default function AdBanners() {
           </tr>
         </thead>
         <tbody>
-          {ads.map((ad) => (
+          {visibleAds.map((ad) => (
             <tr key={ad.id}>
               <td>
                 <img src={ad.image_url} alt="banner" style={{ width: 160, height: 43, objectFit: 'cover', borderRadius: 6 }} />

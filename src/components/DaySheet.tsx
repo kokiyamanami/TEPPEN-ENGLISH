@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { STUDY_CATEGORIES, STUDY_SUBCATEGORIES, StudyLogEntry } from '../data/records';
 import { colors, radius, spacing } from '../theme/colors';
 import { addDays } from '../utils/dateHelpers';
@@ -26,6 +27,7 @@ const EMPTY_FORM = { category: STUDY_CATEGORIES[0].key, subs: [] as string[], mi
 
 // 1日に複数件の学習記録を登録・編集・削除できるシート。日付は矢印で前後に移動できる
 export function DaySheet({ visible, date, entries, onChangeDate, onCancel, onSave, onDelete }: Props) {
+  const insets = useSafeAreaInsets();
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
 
@@ -65,8 +67,8 @@ export function DaySheet({ visible, date, entries, onChangeDate, onCancel, onSav
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onCancel}>
-      <View style={styles.overlay}>
-        <View style={styles.sheet}>
+      <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={[styles.sheet, { paddingTop: insets.top + spacing.lg }]}>
           <ScrollView showsVerticalScrollIndicator={false}>
             <Text style={styles.title}>学習記録</Text>
             <View style={styles.dateNav}>
@@ -168,14 +170,14 @@ export function DaySheet({ visible, date, entries, onChangeDate, onCancel, onSav
             </View>
           </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: colors.white, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, padding: spacing.lg, maxHeight: '88%' },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-start' },
+  sheet: { backgroundColor: colors.white, borderBottomLeftRadius: radius.lg, borderBottomRightRadius: radius.lg, padding: spacing.lg, maxHeight: '88%' },
   title: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
   dateNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.lg, marginTop: spacing.sm },
   dateNavBtn: { width: 28, height: 28, borderRadius: 14, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },

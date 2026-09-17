@@ -1,10 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePhrases } from '../store/PhraseContext';
 import { colors, radius, spacing } from '../theme/colors';
 
 export function PhraseRegisterModal() {
+  const insets = useSafeAreaInsets();
   const { registerState, closeRegister, confirmRegister, folders, addFolder } = usePhrases();
   const [text, setText] = useState('');
   const [folderId, setFolderId] = useState<number | null>(null);
@@ -29,9 +31,9 @@ export function PhraseRegisterModal() {
   };
 
   return (
-    <Modal visible={registerState.visible} transparent animationType="fade" onRequestClose={closeRegister}>
-      <View style={styles.overlay}>
-        <View style={styles.sheet}>
+    <Modal visible={registerState.visible} transparent animationType="slide" onRequestClose={closeRegister}>
+      <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={[styles.sheet, { paddingTop: insets.top + spacing.lg }]}>
           <Text style={styles.title}>MYフレーズに登録</Text>
 
           {registerState.editable ? (
@@ -93,14 +95,14 @@ export function PhraseRegisterModal() {
             </Pressable>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: colors.white, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, padding: spacing.lg },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-start' },
+  sheet: { backgroundColor: colors.white, borderBottomLeftRadius: radius.lg, borderBottomRightRadius: radius.lg, padding: spacing.lg },
   title: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
   textArea: { marginTop: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, padding: spacing.sm, minHeight: 60, fontSize: 13, color: colors.textPrimary, textAlignVertical: 'top' },
   textPreview: { marginTop: spacing.md, backgroundColor: colors.background, borderRadius: radius.sm, padding: spacing.sm },
