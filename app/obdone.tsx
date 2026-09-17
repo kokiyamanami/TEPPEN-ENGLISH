@@ -13,8 +13,9 @@ export default function ObDoneScreen() {
     setSaving(true);
     try {
       await saveProfile();
-    } catch {
+    } catch (e) {
       // 保存に失敗してもオンボーディングは継続させる（次回プロフィール編集画面で再保存可能）
+      console.warn('saveProfile failed at obdone:', e);
     } finally {
       setSaving(false);
       router.replace('/(tabs)/home');

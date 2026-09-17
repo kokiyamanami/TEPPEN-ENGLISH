@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useProfile } from '../src/store/ProfileContext';
 import { useSession } from '../src/store/SessionContext';
@@ -10,9 +10,14 @@ export default function SplashScreen() {
   const { isAuthenticated, loading } = useSession();
   const { loadProfile } = useProfile();
   const [resuming, setResuming] = useState(true);
+  // このSplashはauth/ob1などがpushされた後も裏でマウントされたままになるため、
+  // サインアップ等でisAuthenticatedが後から変化しても再度反応しないよう、
+  // アプリ起動直後の一度きりのセッション復元チェックに限定する
+  const checkedRef = useRef(false);
 
   useEffect(() => {
-    if (loading) return;
+    if (loading || checkedRef.current) return;
+    checkedRef.current = true;
     if (!isAuthenticated) {
       setResuming(false);
       return;
@@ -20,7 +25,7 @@ export default function SplashScreen() {
     loadProfile()
       .then(() => router.replace('/(tabs)/home'))
       .catch(() => setResuming(false));
-  }, [loading, isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (resuming) {
     return (
