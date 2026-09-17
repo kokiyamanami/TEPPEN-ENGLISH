@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
-import { useVideoPlayer, VideoView } from 'expo-video';
+import { useLocalSearchParams } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { WebView } from 'react-native-webview';
 import { TopBar } from '../src/components/TopBar';
-import { LECTURE_SAMPLE_VIDEO, LECTURES } from '../src/data/lectures';
+import { LECTURES } from '../src/data/lectures';
 import { useLectures } from '../src/store/LectureContext';
 import { colors, radius, spacing } from '../src/theme/colors';
 
@@ -12,9 +12,6 @@ export default function LecturePlayerScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const lecture = LECTURES.find((l) => l.id === id);
   const { watchedIds, markWatched } = useLectures();
-  const player = useVideoPlayer(LECTURE_SAMPLE_VIDEO, (p) => {
-    p.loop = false;
-  });
 
   if (!lecture) {
     return (
@@ -30,13 +27,19 @@ export default function LecturePlayerScreen() {
   return (
     <View style={styles.screen}>
       <TopBar title="動画" backRoute="/lecture_list" />
-      <VideoView style={styles.video} player={player} nativeControls />
+      <View style={styles.video}>
+        <WebView
+          source={{ uri: `https://www.youtube.com/embed/${lecture.youtubeId}?playsinline=1` }}
+          allowsFullscreenVideo
+          allowsInlineMediaPlayback
+          mediaPlaybackRequiresUserAction={false}
+          style={styles.webview}
+        />
+      </View>
       <View style={styles.info}>
         <Text style={styles.tag}>{lecture.category}</Text>
         <Text style={styles.title}>{lecture.title}</Text>
-        <Text style={styles.sub}>
-          {lecture.instructor}・{lecture.duration}
-        </Text>
+        <Text style={styles.sub}>{lecture.instructor}</Text>
       </View>
       <Pressable
         style={[styles.watchBtn, watched && styles.watchBtnDone]}
@@ -53,6 +56,7 @@ export default function LecturePlayerScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   video: { width: '100%', aspectRatio: 16 / 9, backgroundColor: '#000' },
+  webview: { flex: 1, backgroundColor: '#000' },
   info: { padding: spacing.lg },
   tag: { fontSize: 10, color: colors.textSecondary, backgroundColor: colors.white, alignSelf: 'flex-start', paddingHorizontal: spacing.xs, paddingVertical: 2, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.border },
   title: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.sm },

@@ -119,23 +119,47 @@ export const groupMembers: GroupMember[] = [
   })),
 }));
 
-const ALL_USERS_NAME_POOL = [
-  '中村 早紀', '小林 陽介', '吉田 蓮', '山本 直樹', '加藤 沙織', '斎藤 拓也', '清水 美咲', '井上 大和',
-  '木村 遥', '林 健二', '橋本 彩', '近藤 亮', '石田 優子', '村上 隼人', '原田 千尋', '松田 亮太',
-  '藤田 恵', '岡田 翔', '西村 麻衣', '後藤 太一', '杉山 真央', '三浦 陸', '宮本 美穂', '長谷川 蓮',
-  '福田 沙也', '酒井 光', '平野 美由紀', '高木 涼太', '大野 千夏', '中川 悠斗',
+// ランキングの全ユーザー/他グループデータはバックエンド(/api/ranking)から取得する。
+// 以下はオフライン等でAPIが取得できなかった場合のフォールバック値（固定・非ランダム）
+export const ALL_USERS_MOCK_FALLBACK = [
+  { name: '中村 早紀', weeklyStudyMin: 612 },
+  { name: '小林 陽介', weeklyStudyMin: 145 },
+  { name: '吉田 蓮', weeklyStudyMin: 388 },
+  { name: '山本 直樹', weeklyStudyMin: 522 },
+  { name: '加藤 沙織', weeklyStudyMin: 201 },
+  { name: '斎藤 拓也', weeklyStudyMin: 467 },
+  { name: '清水 美咲', weeklyStudyMin: 333 },
+  { name: '井上 大和', weeklyStudyMin: 289 },
+  { name: '木村 遥', weeklyStudyMin: 578 },
+  { name: '林 健二', weeklyStudyMin: 176 },
+  { name: '橋本 彩', weeklyStudyMin: 421 },
+  { name: '近藤 亮', weeklyStudyMin: 254 },
+  { name: '石田 優子', weeklyStudyMin: 495 },
+  { name: '村上 隼人', weeklyStudyMin: 312 },
+  { name: '原田 千尋', weeklyStudyMin: 158 },
+  { name: '松田 亮太', weeklyStudyMin: 440 },
+  { name: '藤田 恵', weeklyStudyMin: 367 },
+  { name: '岡田 翔', weeklyStudyMin: 229 },
+  { name: '西村 麻衣', weeklyStudyMin: 503 },
+  { name: '後藤 太一', weeklyStudyMin: 194 },
+  { name: '杉山 真央', weeklyStudyMin: 356 },
+  { name: '三浦 陸', weeklyStudyMin: 271 },
+  { name: '宮本 美穂', weeklyStudyMin: 488 },
+  { name: '長谷川 蓮', weeklyStudyMin: 132 },
+  { name: '福田 沙也', weeklyStudyMin: 399 },
+  { name: '酒井 光', weeklyStudyMin: 245 },
+  { name: '平野 美由紀', weeklyStudyMin: 561 },
+  { name: '高木 涼太', weeklyStudyMin: 218 },
+  { name: '大野 千夏', weeklyStudyMin: 305 },
+  { name: '中川 悠斗', weeklyStudyMin: 452 },
 ];
-export const ALL_USERS_MOCK = ALL_USERS_NAME_POOL.map((name) => ({
-  name,
-  weeklyStudyMin: Math.round(120 + Math.random() * 520),
-}));
 
-export const OTHER_GROUPS_MOCK = [
-  { name: 'bグループ', memberCount: 6, weeklyStudyMin: Math.round(1200 + Math.random() * 900) },
-  { name: 'cグループ', memberCount: 4, weeklyStudyMin: Math.round(1200 + Math.random() * 900) },
-  { name: 'dグループ', memberCount: 5, weeklyStudyMin: Math.round(1200 + Math.random() * 900) },
-  { name: 'eグループ', memberCount: 7, weeklyStudyMin: Math.round(1200 + Math.random() * 900) },
-  { name: 'fグループ', memberCount: 5, weeklyStudyMin: Math.round(1200 + Math.random() * 900) },
+export const OTHER_GROUPS_MOCK_FALLBACK = [
+  { name: 'bグループ', memberCount: 6, weeklyStudyMin: 1840 },
+  { name: 'cグループ', memberCount: 4, weeklyStudyMin: 1420 },
+  { name: 'dグループ', memberCount: 5, weeklyStudyMin: 1965 },
+  { name: 'eグループ', memberCount: 7, weeklyStudyMin: 2210 },
+  { name: 'fグループ', memberCount: 5, weeklyStudyMin: 1580 },
 ];
 
 export function memberTotalForRankingPeriod(weeklyMin: number, period: RecordPeriod): number {

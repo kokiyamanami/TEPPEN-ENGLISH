@@ -1,19 +1,51 @@
 export type Lecture = {
   id: string;
+  youtubeId: string;
   title: string;
   instructor: string;
-  duration: string;
   category: string;
-  color: string;
 };
 
-// TODO(Phase10): 実講座動画への差し替え
+// TEPPEN ENGLISH公式YouTubeチャンネルの実動画
+// https://www.youtube.com/@TEPPENENGLISH/videos
 export const LECTURES: Lecture[] = [
-  { id: 'l1', title: 'ビジネス英語の基礎：メールの書き方', instructor: '田中コーチ', duration: '12:34', category: 'ライティング', color: '#1D4A73' },
-  { id: 'l2', title: '会議で使える便利フレーズ集', instructor: '佐藤チューター', duration: '8:20', category: 'スピーキング', color: '#E8825F' },
-  { id: 'l3', title: '発音矯正：LとRの違いを克服する', instructor: '田中コーチ', duration: '15:02', category: '発音', color: '#4CA98C' },
-  { id: 'l4', title: 'プレゼンの構成：伝わる話し方の型', instructor: '佐藤チューター', duration: '10:47', category: 'スピーキング', color: '#8E4E9C' },
-  { id: 'l5', title: 'ビジネスシーンの敬語表現まとめ', instructor: '田中コーチ', duration: '9:15', category: 'ライティング', color: '#4B5A68' },
+  {
+    id: 'l1',
+    youtubeId: 'HXH-qL4DltE',
+    title: 'TOEIC700～800点でも話せない理由と仕事で使える英語へのロードマップ',
+    instructor: 'TEPPEN ENGLISH',
+    category: '学習法',
+  },
+  {
+    id: 'l2',
+    youtubeId: 'JYZVWfsASeU',
+    title: '英語は何時間勉強すれば話せる？本当に大切なのは時間ではありません',
+    instructor: 'TEPPEN ENGLISH',
+    category: '学習法',
+  },
+  {
+    id: 'l3',
+    youtubeId: 'Ae0dyicbGsw',
+    title: 'ビジネス英語とは？本当に必要なレベルを解説します',
+    instructor: 'TEPPEN ENGLISH',
+    category: 'ビジネス英語',
+  },
+  {
+    id: 'l4',
+    youtubeId: '7ld-qzNW_-s',
+    title: '「I think…」ばかりになっていませんか？同じ表現の繰り返しから抜け出す方法',
+    instructor: 'TEPPEN ENGLISH',
+    category: 'スピーキング',
+  },
+  {
+    id: 'l5',
+    youtubeId: 'mONOTQydDDw',
+    title: '通勤時間だけで英語が話せるようになる「独り言英語」',
+    instructor: 'TEPPEN ENGLISH',
+    category: 'スピーキング',
+  },
 ];
 
-export const LECTURE_SAMPLE_VIDEO = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+export function youtubeThumbnail(youtubeId: string) {
+  return `https://i.ytimg.com/vi/${youtubeId}/hqdefault.jpg`;
+}

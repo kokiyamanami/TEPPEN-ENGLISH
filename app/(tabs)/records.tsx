@@ -1,13 +1,14 @@
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { fetchRanking, RankingGroup, RankingUser } from '../../src/api/ranking';
 import { CalendarGrid } from '../../src/components/CalendarGrid';
 import { DaySheet } from '../../src/components/DaySheet';
 import { RecordChart } from '../../src/components/RecordChart';
 import { ScreenHeader } from '../../src/components/ScreenHeader';
 import {
-  ALL_USERS_MOCK,
-  OTHER_GROUPS_MOCK,
+  ALL_USERS_MOCK_FALLBACK,
+  OTHER_GROUPS_MOCK_FALLBACK,
   RecordPeriod,
   RecordScope,
   StudyLogEntry,
@@ -80,6 +81,21 @@ export default function RecordsScreen() {
   // ---- ranking ----
   const rankingPeriodNoun = PERIOD_LABEL[period];
   const myPersonalTotal = personalTotalForRankingPeriod(period);
+  const [rankingUsers, setRankingUsers] = useState<RankingUser[]>(ALL_USERS_MOCK_FALLBACK);
+  const [rankingGroups, setRankingGroups] = useState<RankingGroup[]>(OTHER_GROUPS_MOCK_FALLBACK);
+  const [rankingLoading, setRankingLoading] = useState(true);
+
+  useEffect(() => {
+    fetchRanking()
+      .then((data) => {
+        setRankingUsers(data.users);
+        setRankingGroups(data.groups);
+      })
+      .catch(() => {
+        // オフライン等の場合は固定フォールバック値のまま
+      })
+      .finally(() => setRankingLoading(false));
+  }, []);
 
   return (
     <ScrollView style={styles.screen}>
@@ -156,10 +172,20 @@ export default function RecordsScreen() {
       </View>
 
       {/* ランキング */}
-      {scope === 'group' ? (
-        <GroupRanking period={period} periodNoun={rankingPeriodNoun} myTotal={myPersonalTotal} />
+      {rankingLoading ? (
+        <View style={styles.rankLoadingWrap}>
+          <ActivityIndicator color={colors.coral} />
+        </View>
+      ) : scope === 'group' ? (
+        <GroupRanking period={period} periodNoun={rankingPeriodNoun} myTotal={myPersonalTotal} groups={rankingGroups} />
       ) : (
-        <PersonalRanking period={period} periodNoun={rankingPeriodNoun} myTotal={myPersonalTotal} myName={profile.name || 'あなた'} />
+        <PersonalRanking
+          period={period}
+          periodNoun={rankingPeriodNoun}
+          myTotal={myPersonalTotal}
+          myName={profile.name || 'あなた'}
+          users={rankingUsers}
+        />
       )}
 
       {/* カレンダー */}
@@ -209,10 +235,22 @@ export default function RecordsScreen() {
   );
 }
 
-function PersonalRanking({ period, periodNoun, myTotal, myName }: { period: RecordPeriod; periodNoun: string; myTotal: number; myName: string }) {
+function PersonalRanking({
+  period,
+  periodNoun,
+  myTotal,
+  myName,
+  users,
+}: {
+  period: RecordPeriod;
+  periodNoun: string;
+  myTotal: number;
+  myName: string;
+  users: RankingUser[];
+}) {
   const rows = [
     { name: myName, min: myTotal, me: true },
-    ...ALL_USERS_MOCK.map((u) => ({ name: u.name, min: memberTotalForRankingPeriod(u.weeklyStudyMin, period), me: false })),
+    ...users.map((u) => ({ name: u.name, min: memberTotalForRankingPeriod(u.weeklyStudyMin, period), me: false })),
   ].sort((a, b) => b.min - a.min);
   const myRank = rows.findIndex((r) => r.me) + 1;
   const top10 = rows.slice(0, 10);
@@ -238,11 +276,21 @@ function PersonalRanking({ period, periodNoun, myTotal, myName }: { period: Reco
   );
 }
 
-function GroupRanking({ period, periodNoun, myTotal }: { period: RecordPeriod; periodNoun: string; myTotal: number }) {
+function GroupRanking({
+  period,
+  periodNoun,
+  myTotal,
+  groups,
+}: {
+  period: RecordPeriod;
+  periodNoun: string;
+  myTotal: number;
+  groups: RankingGroup[];
+}) {
   const myGroupTotal = myTotal + groupMembers.reduce((a, m) => a + memberTotalForRankingPeriod(m.weeklyStudyMin, period), 0);
   const rows = [
     { name: 'aグループ', min: myGroupTotal, me: true },
-    ...OTHER_GROUPS_MOCK.map((g) => ({ name: g.name, min: memberTotalForRankingPeriod(g.weeklyStudyMin, period), me: false })),
+    ...groups.map((g) => ({ name: g.name, min: memberTotalForRankingPeriod(g.weeklyStudyMin, period), me: false })),
   ].sort((a, b) => b.min - a.min);
 
   return (
@@ -298,6 +346,7 @@ const styles = StyleSheet.create({
   chartTap: { fontSize: 10, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xs },
   sumRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.md },
   sumRowSub: { marginTop: spacing.xs },
+  rankLoadingWrap: { paddingVertical: spacing.xl, alignItems: 'center' },
   sumMetric: { fontSize: 12, color: colors.textSecondary },
   sumVal: { fontSize: 12, color: colors.textPrimary, fontWeight: '600' },
   rankCard: { marginHorizontal: spacing.lg, backgroundColor: colors.white, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border },

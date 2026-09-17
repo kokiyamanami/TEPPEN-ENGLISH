@@ -7,6 +7,7 @@ const path = require('path');
 const crypto = require('crypto');
 const OpenAI = require('openai');
 const { toFile } = require('openai/uploads');
+const { ALL_USERS_MOCK, OTHER_GROUPS_MOCK } = require('./rankingData');
 
 const app = express();
 app.use(cors());
@@ -20,6 +21,11 @@ fs.mkdirSync(TTS_CACHE_DIR, { recursive: true });
 
 app.get('/api/health', (req, res) => {
   res.json({ ok: true, hasKey: Boolean(process.env.OPENAI_API_KEY) });
+});
+
+// GET /api/ranking -> 全ユーザー・他グループのモックランキングデータ（固定値、サーバー起動中は安定）
+app.get('/api/ranking', (req, res) => {
+  res.json({ users: ALL_USERS_MOCK, groups: OTHER_GROUPS_MOCK });
 });
 
 // POST /api/grade
