@@ -80,14 +80,32 @@ export async function apiDelete<T>(path: string): Promise<T> {
   return res.json();
 }
 
-export async function uploadAvatar(uri: string): Promise<{ avatarUrl: string }> {
+// mimeType文字列 -> 拡張子・安全なContent-Typeの対応表。
+// URIの末尾を文字列パースして拡張子を推測すると、Androidのcontent://URIなど
+// 拡張子を含まないURIで壊れたヘッダーになりアップロードが失敗するため、
+// expo-image-pickerが返すmimeTypeを優先的に使う
+const MIME_TO_EXT: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/jpg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/heic': 'heic',
+  'image/heif': 'heic',
+};
+
+export async function uploadAvatar(uri: string, mimeType?: string | null, fileName?: string | null): Promise<{ avatarUrl: string }> {
   const token = await getStoredToken();
   const formData = new FormData();
-  const ext = uri.split('.').pop()?.toLowerCase() || 'jpg';
+
+  const normalizedMime = mimeType && MIME_TO_EXT[mimeType.toLowerCase()] ? mimeType.toLowerCase() : null;
+  const extFromFileName = fileName?.includes('.') ? fileName.split('.').pop()?.toLowerCase() : null;
+  const ext = normalizedMime ? MIME_TO_EXT[normalizedMime] : extFromFileName && /^[a-z0-9]{2,4}$/.test(extFromFileName) ? extFromFileName : 'jpg';
+  const type = normalizedMime || 'image/jpeg';
+
   formData.append('avatar', {
     uri,
     name: `avatar.${ext}`,
-    type: `image/${ext === 'jpg' ? 'jpeg' : ext}`,
+    type,
   } as unknown as Blob);
 
   // Content-Typeは指定しない: fetchがFormDataから正しいmultipart境界を自動付与する
@@ -96,6 +114,9 @@ export async function uploadAvatar(uri: string): Promise<{ avatarUrl: string }> 
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     body: formData,
   });
-  if (!res.ok) throw new Error(`avatar upload failed (${res.status})`);
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`avatar upload failed (${res.status}): ${text}`);
+  }
   return res.json();
 }

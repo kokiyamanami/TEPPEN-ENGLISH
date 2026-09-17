@@ -61,7 +61,7 @@ type ProfileContextValue = {
   saveProfile: () => Promise<void>;
   saveOnboardingProgress: (step: string) => Promise<void>;
   completeOnboarding: () => Promise<void>;
-  uploadAvatar: (uri: string) => Promise<void>;
+  uploadAvatar: (uri: string, mimeType?: string | null, fileName?: string | null) => Promise<void>;
 };
 
 const ProfileContext = createContext<ProfileContextValue | null>(null);
@@ -82,8 +82,8 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     return { onboardingStep: res.onboardingStep, onboardingComplete: res.onboardingComplete };
   };
 
-  const uploadAvatar = async (uri: string) => {
-    const res = await uploadAvatarRequest(uri);
+  const uploadAvatar = async (uri: string, mimeType?: string | null, fileName?: string | null) => {
+    const res = await uploadAvatarRequest(uri, mimeType, fileName);
     setAvatarUrl(res.avatarUrl);
   };
 

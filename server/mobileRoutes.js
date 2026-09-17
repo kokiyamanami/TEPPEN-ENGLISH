@@ -86,21 +86,35 @@ router.get('/me', (req, res) => {
 router.post('/avatar', avatarUpload.single('avatar'), (req, res) => {
   const file = req.file;
   if (!file) return res.status(400).json({ error: 'avatar file is required' });
-  const ext = (path.extname(file.originalname || '') || '.jpg').toLowerCase();
-  const safeExt = ['.jpg', '.jpeg', '.png', '.webp'].includes(ext) ? ext : '.jpg';
-  const filename = `${req.studentId}-${Date.now()}${safeExt}`;
-  const dest = path.join(AVATAR_DIR, filename);
-  fs.renameSync(file.path, dest);
 
-  const student = db.prepare('SELECT avatar_url FROM students WHERE id = ?').get(req.studentId);
-  const oldUrl = student?.avatar_url;
-  const avatarUrl = `/avatars/${filename}`;
-  db.prepare('UPDATE students SET avatar_url = ? WHERE id = ?').run(avatarUrl, req.studentId);
+  try {
+    const ext = (path.extname(file.originalname || '') || '.jpg').toLowerCase();
+    const safeExt = ['.jpg', '.jpeg', '.png', '.webp', '.heic'].includes(ext) ? ext : '.jpg';
+    const filename = `${req.studentId}-${Date.now()}${safeExt}`;
+    const dest = path.join(AVATAR_DIR, filename);
+    // renameSyncは/tmpと保存先が別ファイルシステムだとEXDEVで失敗するため、コピー+削除にフォールバック
+    try {
+      fs.renameSync(file.path, dest);
+    } catch (renameErr) {
+      if (renameErr.code !== 'EXDEV') throw renameErr;
+      fs.copyFileSync(file.path, dest);
+      fs.unlink(file.path, () => {});
+    }
 
-  if (oldUrl && oldUrl.startsWith('/avatars/')) {
-    fs.unlink(path.join(__dirname, 'public', oldUrl), () => {});
+    const student = db.prepare('SELECT avatar_url FROM students WHERE id = ?').get(req.studentId);
+    const oldUrl = student?.avatar_url;
+    const avatarUrl = `/avatars/${filename}`;
+    db.prepare('UPDATE students SET avatar_url = ? WHERE id = ?').run(avatarUrl, req.studentId);
+
+    if (oldUrl && oldUrl.startsWith('/avatars/')) {
+      fs.unlink(path.join(__dirname, 'public', oldUrl), () => {});
+    }
+    res.json({ avatarUrl });
+  } catch (err) {
+    console.error('avatar upload error:', err);
+    fs.unlink(file.path, () => {});
+    res.status(500).json({ error: 'avatar_upload_failed', detail: String(err.message || err) });
   }
-  res.json({ avatarUrl });
 });
 
 // オンボーディング各ステップの「次へ」で呼び出し、途中離脱しても再開できるようにする

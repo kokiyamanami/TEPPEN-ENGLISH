@@ -105,6 +105,10 @@ function MultiSelectField({ field }: { field: OnboardField }) {
   const [draft, setDraft] = useState('');
 
   const toggleOption = (option: string) => {
+    if (field.single) {
+      setField(field.field, (values.includes(option) ? [] : [option]) as Profile[typeof field.field]);
+      return;
+    }
     const next = values.includes(option) ? values.filter((v) => v !== option) : [...values, option];
     setField(field.field, next as Profile[typeof field.field]);
   };
@@ -119,7 +123,7 @@ function MultiSelectField({ field }: { field: OnboardField }) {
       setDraft('');
       return;
     }
-    setField(field.field, [...values, trimmed] as Profile[typeof field.field]);
+    setField(field.field, (field.single ? [trimmed] : [...values, trimmed]) as Profile[typeof field.field]);
     setDraft('');
   };
 
@@ -127,7 +131,10 @@ function MultiSelectField({ field }: { field: OnboardField }) {
 
   return (
     <View style={styles.fieldBlock}>
-      <Text style={styles.label}>{field.label}（複数選択可）</Text>
+      <View style={styles.multiHeader}>
+        <Text style={styles.multiLabel}>{field.label}</Text>
+        <Text style={styles.multiHint}>{field.single ? '1つ選択' : '複数選択可'}</Text>
+      </View>
       <View style={styles.chipRow}>
         {field.options?.map((option) => {
           const selected = values.includes(option);
@@ -137,17 +144,12 @@ function MultiSelectField({ field }: { field: OnboardField }) {
             </Pressable>
           );
         })}
+        {customValues.map((v) => (
+          <Pressable key={v} style={[styles.chip, styles.chipSelected]} onPress={() => removeValue(v)}>
+            <Text style={[styles.chipText, styles.chipTextSelected]}>{v} ×</Text>
+          </Pressable>
+        ))}
       </View>
-
-      {customValues.length > 0 && (
-        <View style={[styles.chipRow, { marginTop: spacing.xs }]}>
-          {customValues.map((v) => (
-            <Pressable key={v} style={[styles.chip, styles.chipSelected, styles.chipRemovable]} onPress={() => removeValue(v)}>
-              <Text style={[styles.chipText, styles.chipTextSelected]}>{v} ×</Text>
-            </Pressable>
-          ))}
-        </View>
-      )}
 
       <View style={styles.addRow}>
         <TextInput
@@ -191,15 +193,24 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
   chipSelected: { backgroundColor: colors.navy, borderColor: colors.navy },
-  chipRemovable: { backgroundColor: colors.coral, borderColor: colors.coral },
   chipText: { color: colors.textPrimary, fontSize: 13 },
   chipTextSelected: { color: colors.white },
+  multiHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: spacing.xs },
+  multiLabel: { fontSize: 13, color: colors.textSecondary },
+  multiHint: { fontSize: 11, color: colors.textSecondary },
   sliderHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   sliderValue: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
   sliderRangeRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: -spacing.xs },
   sliderRangeText: { fontSize: 11, color: colors.textSecondary },
   counter: { fontSize: 11, color: colors.textSecondary },
-  addRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
+  addRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
   addInput: { flex: 1 },
   addBtn: { backgroundColor: colors.coral, borderRadius: radius.sm, paddingHorizontal: spacing.md, alignItems: 'center', justifyContent: 'center' },
   addBtnText: { color: colors.white, fontWeight: '700', fontSize: 13 },

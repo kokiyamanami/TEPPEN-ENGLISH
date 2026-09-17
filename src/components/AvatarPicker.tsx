@@ -29,10 +29,12 @@ export function AvatarPicker({ size = 88 }: { size?: number }) {
     });
     if (result.canceled || !result.assets?.[0]) return;
 
+    const asset = result.assets[0];
     setUploading(true);
     try {
-      await uploadAvatar(result.assets[0].uri);
+      await uploadAvatar(asset.uri, asset.mimeType, asset.fileName);
     } catch (e) {
+      console.error('avatar upload failed:', e);
       Alert.alert('アップロードに失敗しました', e instanceof Error ? e.message : '通信に失敗しました');
     } finally {
       setUploading(false);

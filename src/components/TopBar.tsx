@@ -1,11 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing } from '../theme/colors';
 
 export function TopBar({ title, backRoute }: { title: string; backRoute?: string }) {
+  const insets = useSafeAreaInsets();
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top + spacing.sm }]}>
       <Pressable
         style={styles.backBtn}
         onPress={() => (backRoute ? router.replace(backRoute as never) : router.back())}

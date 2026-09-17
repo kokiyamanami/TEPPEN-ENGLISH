@@ -10,6 +10,7 @@ export type OnboardField = {
   min?: number;
   max?: number;
   maxLength?: number;
+  single?: boolean; // type:'multi'で、実質1つしか選べないようにする場合true（例: 職位）
 };
 
 export type OnboardStep = {
@@ -44,7 +45,7 @@ export const onboardSteps: OnboardStep[] = [
     sub: '業種・役職に合わせたビジネスシーン教材を自動生成します。選択肢になければ自由入力もできます（複数選択可）。',
     fields: [
       { type: 'multi', field: 'job', label: '職業', options: JOB_OPTIONS },
-      { type: 'multi', field: 'position', label: '職位', options: POSITION_OPTIONS },
+      { type: 'multi', field: 'position', label: '職位', options: POSITION_OPTIONS, single: true },
       { type: 'textarea', field: 'jobDetail', label: '職業詳細', maxLength: FREE_TEXT_MAX },
     ],
   },
