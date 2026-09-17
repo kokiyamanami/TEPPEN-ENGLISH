@@ -1,5 +1,5 @@
 import { createContext, ReactNode, useContext, useState } from 'react';
-import { apiGet, apiPatch } from '../api/mobileAuth';
+import { apiGet, apiPatch, apiPost } from '../api/mobileAuth';
 
 export type Profile = {
   name: string;
@@ -37,11 +37,15 @@ export const emptyProfile: Profile = {
   termGoal: '',
 };
 
+type MeResponse = { profile: Partial<Profile>; onboardingStep: string; onboardingComplete: boolean };
+
 type ProfileContextValue = {
   profile: Profile;
   setField: <K extends keyof Profile>(field: K, value: Profile[K]) => void;
-  loadProfile: () => Promise<void>;
+  loadProfile: () => Promise<{ onboardingStep: string; onboardingComplete: boolean }>;
   saveProfile: () => Promise<void>;
+  saveOnboardingProgress: (step: string) => Promise<void>;
+  completeOnboarding: () => Promise<void>;
 };
 
 const ProfileContext = createContext<ProfileContextValue | null>(null);
@@ -53,10 +57,11 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     setProfile((prev) => ({ ...prev, [field]: value }));
   };
 
-  // ログイン直後・アプリ再起動時にサーバーから最新プロフィールを取得
+  // ログイン直後・アプリ再起動時にサーバーから最新プロフィールとオンボーディング進捗を取得
   const loadProfile = async () => {
-    const res = await apiGet<{ profile: Partial<Profile> }>('/me');
+    const res = await apiGet<MeResponse>('/me');
     setProfile((prev) => ({ ...prev, ...res.profile }));
+    return { onboardingStep: res.onboardingStep, onboardingComplete: res.onboardingComplete };
   };
 
   // オンボーディング完了時・プロフィール編集保存時にサーバーへ反映
@@ -64,7 +69,20 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     await apiPatch('/profile', profile);
   };
 
-  return <ProfileContext.Provider value={{ profile, setField, loadProfile, saveProfile }}>{children}</ProfileContext.Provider>;
+  // オンボーディング各ステップの「次へ」で呼び出し、途中離脱しても再開できるようにする
+  const saveOnboardingProgress = async (step: string) => {
+    await apiPost('/onboarding-progress', { step });
+  };
+
+  const completeOnboarding = async () => {
+    await apiPost('/onboarding-complete');
+  };
+
+  return (
+    <ProfileContext.Provider value={{ profile, setField, loadProfile, saveProfile, saveOnboardingProgress, completeOnboarding }}>
+      {children}
+    </ProfileContext.Provider>
+  );
 }
 
 export function useProfile() {

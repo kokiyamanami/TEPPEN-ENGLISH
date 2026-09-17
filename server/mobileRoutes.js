@@ -64,7 +64,27 @@ router.get('/me', (req, res) => {
   const student = db.prepare('SELECT * FROM students WHERE id = ?').get(req.studentId);
   if (!student) return res.status(404).json({ error: 'not_found' });
   const profile = JSON.parse(student.profile_json || '{}');
-  res.json({ id: student.id, email: student.email, phase: student.phase, profile: { name: student.name, ...profile } });
+  res.json({
+    id: student.id,
+    email: student.email,
+    phase: student.phase,
+    profile: { name: student.name, ...profile },
+    onboardingStep: student.onboarding_step || 'ob1',
+    onboardingComplete: !!student.onboarding_complete,
+  });
+});
+
+// オンボーディング各ステップの「次へ」で呼び出し、途中離脱しても再開できるようにする
+router.post('/onboarding-progress', (req, res) => {
+  const { step } = req.body || {};
+  if (!step) return res.status(400).json({ error: 'step is required' });
+  db.prepare('UPDATE students SET onboarding_step = ? WHERE id = ?').run(step, req.studentId);
+  res.json({ ok: true });
+});
+
+router.post('/onboarding-complete', (req, res) => {
+  db.prepare("UPDATE students SET onboarding_complete = 1, onboarding_step = 'obdone' WHERE id = ?").run(req.studentId);
+  res.json({ ok: true });
 });
 
 router.patch('/profile', (req, res) => {

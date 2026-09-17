@@ -1,15 +1,18 @@
 import { router } from 'expo-router';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { OnboardFieldInput } from '../components/OnboardFieldInput';
 import { OnboardProgress } from '../components/OnboardProgress';
 import { onboardSteps } from '../data/onboarding';
+import { useProfile } from '../store/ProfileContext';
 import { colors, radius, spacing } from '../theme/colors';
 
 export function OnboardStepScreen({ stepIndex }: { stepIndex: number }) {
   const step = onboardSteps[stepIndex];
   const total = onboardSteps.length;
   const backRoute = stepIndex === 0 ? '/auth' : `/${onboardSteps[stepIndex - 1].key}`;
-  const nextRoute = stepIndex === total - 1 ? '/obperm' : `/${onboardSteps[stepIndex + 1].key}`;
+  const nextStepKey = stepIndex === total - 1 ? 'obperm' : onboardSteps[stepIndex + 1].key;
+  const nextRoute = `/${nextStepKey}`;
 
   return (
     <KeyboardAvoidingView
@@ -24,19 +27,35 @@ export function OnboardStepScreen({ stepIndex }: { stepIndex: number }) {
           <OnboardFieldInput key={f.field} field={f} />
         ))}
       </ScrollView>
-      <Footer backRoute={backRoute} nextRoute={nextRoute} />
+      <Footer backRoute={backRoute} nextRoute={nextRoute} nextStepKey={nextStepKey} />
     </KeyboardAvoidingView>
   );
 }
 
-function Footer({ backRoute, nextRoute }: { backRoute: string; nextRoute: string }) {
+function Footer({ backRoute, nextRoute, nextStepKey }: { backRoute: string; nextRoute: string; nextStepKey: string }) {
+  const { saveProfile, saveOnboardingProgress } = useProfile();
+  const [saving, setSaving] = useState(false);
+
+  const onNext = async () => {
+    setSaving(true);
+    try {
+      // 途中離脱しても再開できるよう、入力内容と現在地をサーバーに保存
+      await Promise.all([saveProfile(), saveOnboardingProgress(nextStepKey)]);
+    } catch (e) {
+      console.warn('onboarding progress save failed:', e);
+    } finally {
+      setSaving(false);
+      router.push(nextRoute as never);
+    }
+  };
+
   return (
     <View style={styles.footer}>
       <Pressable style={styles.backBtn} onPress={() => router.push(backRoute as never)}>
         <Text style={styles.backText}>戻る</Text>
       </Pressable>
-      <Pressable style={styles.nextBtn} onPress={() => router.push(nextRoute as never)}>
-        <Text style={styles.nextText}>次へ</Text>
+      <Pressable style={styles.nextBtn} onPress={onNext} disabled={saving}>
+        {saving ? <ActivityIndicator color={colors.white} /> : <Text style={styles.nextText}>次へ</Text>}
       </Pressable>
     </View>
   );

@@ -5,6 +5,7 @@ import { BrandLogo } from '../src/components/BrandLogo';
 import { useProfile } from '../src/store/ProfileContext';
 import { useSession } from '../src/store/SessionContext';
 import { colors, radius, spacing } from '../src/theme/colors';
+import { resolveEntryRoute } from '../src/utils/onboardingNav';
 
 type AuthTab = 'login' | 'signup';
 
@@ -45,8 +46,8 @@ export default function AuthScreen() {
         router.push('/ob1');
       } else {
         await login(email.trim(), password);
-        await loadProfile();
-        router.replace('/(tabs)/home');
+        const status = await loadProfile();
+        router.replace(resolveEntryRoute(status) as never);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : '通信に失敗しました');

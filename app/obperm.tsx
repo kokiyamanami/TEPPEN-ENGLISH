@@ -2,17 +2,33 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { AudioModule } from 'expo-audio';
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { OnboardProgress } from '../src/components/OnboardProgress';
 import { TOTAL_OB_STEPS } from '../src/data/onboarding';
+import { useProfile } from '../src/store/ProfileContext';
 import { colors, radius, spacing } from '../src/theme/colors';
 
 // screen key: obperm
 // マイクは実際のOS許可を取得し、両方の許可が揃うまで次へ進めない
 export default function ObPermScreen() {
+  const { saveOnboardingProgress } = useProfile();
   const [micGranted, setMicGranted] = useState(false);
   const [speakerGranted, setSpeakerGranted] = useState(false);
+  const [saving, setSaving] = useState(false);
   const canProceed = micGranted && speakerGranted;
+
+  const onNext = async () => {
+    setSaving(true);
+    try {
+      // 途中離脱しても再開できるよう現在地を保存
+      await saveOnboardingProgress('obdone');
+    } catch (e) {
+      console.warn('onboarding progress save failed:', e);
+    } finally {
+      setSaving(false);
+      router.push('/obdone');
+    }
+  };
 
   const requestMic = async () => {
     const { granted } = await AudioModule.requestRecordingPermissionsAsync();
@@ -60,10 +76,10 @@ export default function ObPermScreen() {
         </Pressable>
         <Pressable
           style={[styles.nextBtn, !canProceed && styles.nextBtnDisabled]}
-          onPress={() => router.push('/obdone')}
-          disabled={!canProceed}
+          onPress={onNext}
+          disabled={!canProceed || saving}
         >
-          <Text style={styles.nextText}>次へ</Text>
+          {saving ? <ActivityIndicator color={colors.white} /> : <Text style={styles.nextText}>次へ</Text>}
         </Pressable>
       </View>
     </View>

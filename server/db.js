@@ -38,7 +38,9 @@ CREATE TABLE IF NOT EXISTS students (
   group_id INTEGER REFERENCES groups(id),
   phase INTEGER NOT NULL DEFAULT 1,
   status TEXT NOT NULL DEFAULT 'active',
-  last_login TEXT
+  last_login TEXT,
+  onboarding_step TEXT NOT NULL DEFAULT 'ob1',
+  onboarding_complete INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS speaking_stats (
@@ -130,6 +132,15 @@ CREATE TABLE IF NOT EXISTS announcements (
 );
 `);
 
+// 既存DB（作成済みのadmin.sqlite）に新カラムを後付けするマイグレーション
+const studentCols = db.prepare('PRAGMA table_info(students)').all().map((c) => c.name);
+if (!studentCols.includes('onboarding_step')) {
+  db.exec("ALTER TABLE students ADD COLUMN onboarding_step TEXT NOT NULL DEFAULT 'ob1'");
+}
+if (!studentCols.includes('onboarding_complete')) {
+  db.exec('ALTER TABLE students ADD COLUMN onboarding_complete INTEGER NOT NULL DEFAULT 0');
+}
+
 function addDaysStr(days) {
   const d = new Date();
   d.setDate(d.getDate() + days);
@@ -159,7 +170,8 @@ function seedIfEmpty() {
   ];
 
   const insertStudent = db.prepare(
-    'INSERT INTO students (name, email, phone, group_id, phase, status, last_login) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    `INSERT INTO students (name, email, phone, group_id, phase, status, last_login, onboarding_complete)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 1)`
   );
   const insertStat = db.prepare('INSERT INTO speaking_stats (student_id, date, study_min, speak_min) VALUES (?, ?, ?, ?)');
   const insertMonthly = db.prepare('INSERT INTO monthly_mission_results (student_id, month, pass, date) VALUES (?, ?, ?, ?)');

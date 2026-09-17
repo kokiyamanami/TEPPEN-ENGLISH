@@ -6,13 +6,14 @@ import { colors, radius, spacing } from '../src/theme/colors';
 
 // screen key: obdone
 export default function ObDoneScreen() {
-  const { saveProfile } = useProfile();
+  const { saveProfile, completeOnboarding } = useProfile();
   const [saving, setSaving] = useState(false);
 
   const finish = async () => {
     setSaving(true);
     try {
       await saveProfile();
+      await completeOnboarding();
     } catch (e) {
       // 保存に失敗してもオンボーディングは継続させる（次回プロフィール編集画面で再保存可能）
       console.warn('saveProfile failed at obdone:', e);

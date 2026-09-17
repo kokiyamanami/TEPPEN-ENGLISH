@@ -5,6 +5,7 @@ import { BrandLogo } from '../src/components/BrandLogo';
 import { useProfile } from '../src/store/ProfileContext';
 import { useSession } from '../src/store/SessionContext';
 import { colors, radius, spacing } from '../src/theme/colors';
+import { resolveEntryRoute } from '../src/utils/onboardingNav';
 
 // screen key: splash
 export default function SplashScreen() {
@@ -24,7 +25,7 @@ export default function SplashScreen() {
       return;
     }
     loadProfile()
-      .then(() => router.replace('/(tabs)/home'))
+      .then((status) => router.replace(resolveEntryRoute(status) as never))
       .catch(() => setResuming(false));
   }, [loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
