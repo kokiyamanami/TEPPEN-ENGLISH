@@ -87,7 +87,7 @@ router.get('/overview', (req, res) => {
 // ---- students ----
 router.get('/students', (req, res) => {
   const { search = '', groupId = '', status = '' } = req.query;
-  let sql = `SELECT s.*, g.name as group_name FROM students s LEFT JOIN groups g ON g.id = s.group_id WHERE 1=1`;
+  let sql = `SELECT s.id, s.name, s.email, s.phone, s.group_id, s.phase, s.status, s.last_login, g.name as group_name FROM students s LEFT JOIN groups g ON g.id = s.group_id WHERE 1=1`;
   const params = [];
   if (search) {
     sql += ` AND s.name LIKE ?`;
@@ -139,7 +139,7 @@ router.patch('/students/:id', (req, res) => {
 
 router.get('/students/:id', (req, res) => {
   const student = db
-    .prepare(`SELECT s.*, g.name as group_name FROM students s LEFT JOIN groups g ON g.id = s.group_id WHERE s.id = ?`)
+    .prepare(`SELECT s.id, s.name, s.email, s.phone, s.group_id, s.phase, s.status, s.last_login, g.name as group_name FROM students s LEFT JOIN groups g ON g.id = s.group_id WHERE s.id = ?`)
     .get(req.params.id);
   if (!student) return res.status(404).json({ error: 'not_found' });
 
@@ -154,7 +154,12 @@ router.get('/students/:id', (req, res) => {
     .prepare(`SELECT * FROM unit_submissions WHERE student_id = ? ORDER BY submitted_at DESC`)
     .all(req.params.id);
   const chatMessages = db.prepare(`SELECT * FROM chat_messages WHERE student_id = ? ORDER BY id ASC`).all(req.params.id);
-  const phrases = db.prepare(`SELECT * FROM phrases WHERE student_id = ?`).all(req.params.id);
+  const phrases = db
+    .prepare(
+      `SELECT p.id, p.text, p.text_jp, p.learned, f.name as folder_name FROM phrases p
+       LEFT JOIN phrase_folders f ON f.id = p.folder_id WHERE p.student_id = ?`
+    )
+    .all(req.params.id);
 
   res.json({ student, speakingStats, monthlyMissions, phaseHistory, unitSubmissions, chatMessages, phrases });
 });

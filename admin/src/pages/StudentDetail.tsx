@@ -11,7 +11,7 @@ type StudentDetailData = {
   phaseHistory: { id: number; phase: number; date: string; listening: number; accuracy: number; fluency: number; clarity: number }[];
   unitSubmissions: { id: number; unit: number; submitted_at: string; status: string }[];
   chatMessages: { id: number; sender: string; text: string; time: string }[];
-  phrases: { id: number; text: string; category: string }[];
+  phrases: { id: number; text: string; folder_name: string }[];
 };
 
 export default function StudentDetail() {
@@ -263,7 +263,7 @@ export default function StudentDetail() {
             {data.phrases.map((p) => (
               <div key={p.id} style={{ marginBottom: 8 }}>
                 <div style={{ fontSize: 13 }}>{p.text}</div>
-                <span className="tag">{p.category}</span>
+                <span className="tag">{p.folder_name}</span>
               </div>
             ))}
             {data.phrases.length === 0 && <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>登録なし</div>}

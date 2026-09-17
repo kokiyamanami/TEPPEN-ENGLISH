@@ -31,8 +31,10 @@ CREATE TABLE IF NOT EXISTS coaches (
 CREATE TABLE IF NOT EXISTS students (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
-  email TEXT,
+  email TEXT UNIQUE,
   phone TEXT,
+  password_hash TEXT,
+  profile_json TEXT,
   group_id INTEGER REFERENCES groups(id),
   phase INTEGER NOT NULL DEFAULT 1,
   status TEXT NOT NULL DEFAULT 'active',
@@ -44,7 +46,18 @@ CREATE TABLE IF NOT EXISTS speaking_stats (
   student_id INTEGER REFERENCES students(id),
   date TEXT NOT NULL,
   study_min INTEGER NOT NULL,
-  speak_min INTEGER NOT NULL
+  speak_min INTEGER NOT NULL,
+  category TEXT,
+  subcategories TEXT,
+  memo TEXT,
+  UNIQUE(student_id, date)
+);
+
+CREATE TABLE IF NOT EXISTS phrase_folders (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  student_id INTEGER REFERENCES students(id),
+  name TEXT NOT NULL,
+  source TEXT NOT NULL DEFAULT 'custom'
 );
 
 CREATE TABLE IF NOT EXISTS monthly_mission_results (
@@ -85,8 +98,10 @@ CREATE TABLE IF NOT EXISTS chat_messages (
 CREATE TABLE IF NOT EXISTS phrases (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   student_id INTEGER REFERENCES students(id),
+  folder_id INTEGER REFERENCES phrase_folders(id),
   text TEXT NOT NULL,
-  category TEXT
+  text_jp TEXT,
+  learned INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS group_goals (
@@ -151,7 +166,8 @@ function seedIfEmpty() {
   const insertPhaseHist = db.prepare(
     'INSERT INTO phase_history (student_id, phase, date, listening, accuracy, fluency, clarity) VALUES (?, ?, ?, ?, ?, ?, ?)'
   );
-  const insertPhrase = db.prepare('INSERT INTO phrases (student_id, text, category) VALUES (?, ?, ?)');
+  const insertFolder = db.prepare('INSERT INTO phrase_folders (student_id, name, source) VALUES (?, ?, ?)');
+  const insertPhrase = db.prepare('INSERT INTO phrases (student_id, folder_id, text, text_jp) VALUES (?, ?, ?, ?)');
   const insertChat = db.prepare('INSERT INTO chat_messages (student_id, sender, text, time) VALUES (?, ?, ?, ?)');
   const insertUnit = db.prepare('INSERT INTO unit_submissions (student_id, unit, submitted_at, status) VALUES (?, ?, ?, ?)');
 
@@ -185,9 +201,11 @@ function seedIfEmpty() {
       2 + Math.floor(Math.random() * 3)
     );
 
+    const f1 = insertFolder.run(studentId, '重要構文40', 'official').lastInsertRowid;
+    const f2 = insertFolder.run(studentId, 'お役立ちフレーズ50', 'official').lastInsertRowid;
     if (i % 3 === 0) {
-      insertPhrase.run(studentId, 'Let me walk you through the numbers.', '重要構文40');
-      insertPhrase.run(studentId, 'Could you elaborate on that?', 'お役立ちフレーズ50');
+      insertPhrase.run(studentId, f1, 'Let me walk you through the numbers.', '数字についてご説明させてください。');
+      insertPhrase.run(studentId, f2, 'Could you elaborate on that?', 'もう少し詳しく教えていただけますか？');
     }
 
     insertChat.run(studentId, 'coach', 'MYピッチの提出お待ちしています。準備で困っていることがあればどうぞ。', addDaysStr(-1));
