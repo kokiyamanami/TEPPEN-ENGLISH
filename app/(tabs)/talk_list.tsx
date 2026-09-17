@@ -1,11 +1,11 @@
-import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { AdBanner } from '../../src/components/AdBanner';
 import { ScreenHeader } from '../../src/components/ScreenHeader';
 import { TalkAvatar } from '../../src/components/TalkAvatar';
 import { TALK_ORDER } from '../../src/data/talk';
 import { useTalk } from '../../src/store/TalkContext';
-import { colors, radius, spacing } from '../../src/theme/colors';
+import { colors, spacing } from '../../src/theme/colors';
 
 // screen key: talk_list
 export default function TalkListScreen() {
@@ -15,17 +15,7 @@ export default function TalkListScreen() {
     <ScrollView style={styles.screen}>
       <ScreenHeader title="トーク" />
 
-      <Pressable style={styles.promo} onPress={() => router.push('/sw_lp')}>
-        <View style={styles.promoMark}>
-          <Ionicons name="airplane-outline" size={20} color={colors.white} />
-        </View>
-        <View style={styles.promoBody}>
-          <Text style={styles.promoEyebrow}>スクールウィズ</Text>
-          <Text style={styles.promoTitle}>英語力UPの留学エージェント</Text>
-          <Text style={styles.promoSub}>留学手数料¥0・カウンセラーに無料相談してみませんか？</Text>
-        </View>
-        <Ionicons name="chevron-forward" size={18} color={colors.white} />
-      </Pressable>
+      <AdBanner placement="talk" />
 
       <View style={styles.list}>
         {TALK_ORDER.map((key) => {
@@ -62,20 +52,6 @@ export default function TalkListScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  promo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginHorizontal: spacing.lg,
-    backgroundColor: colors.navy,
-    borderRadius: radius.md,
-    padding: spacing.md,
-  },
-  promoMark: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
-  promoBody: { flex: 1 },
-  promoEyebrow: { color: colors.coralLight, fontSize: 10 },
-  promoTitle: { color: colors.white, fontWeight: '700', fontSize: 13, marginTop: 2 },
-  promoSub: { color: colors.white, fontSize: 10, marginTop: 2, opacity: 0.8 },
   list: { marginTop: spacing.md, marginBottom: spacing.xl },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
   body: { flex: 1 },

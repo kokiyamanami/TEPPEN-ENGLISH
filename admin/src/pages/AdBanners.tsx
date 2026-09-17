@@ -3,13 +3,18 @@ import { api } from '../api/client';
 import { Modal } from '../components/Modal';
 import { useToast } from '../context/ToastContext';
 
+type Placement = 'home' | 'talk' | 'mypage';
+
 type AdBanner = {
   id: number;
   image_url: string;
   link_url: string | null;
+  placement: Placement;
   enabled: number;
   sort_order: number;
 };
+
+const PLACEMENT_LABEL: Record<Placement, string> = { home: 'トレーニング（ホーム）', talk: 'トーク', mypage: 'マイページ' };
 
 export default function AdBanners() {
   const toast = useToast();
@@ -17,6 +22,7 @@ export default function AdBanners() {
   const [showCreate, setShowCreate] = useState(false);
   const [imageUrl, setImageUrl] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
+  const [placement, setPlacement] = useState<Placement>('home');
   const [sortOrder, setSortOrder] = useState('0');
 
   const load = () => api.get<AdBanner[]>('/ads').then(setAds);
@@ -28,6 +34,12 @@ export default function AdBanners() {
   const toggleEnabled = async (ad: AdBanner) => {
     await api.patch(`/ads/${ad.id}`, { enabled: ad.enabled ? false : true });
     toast(ad.enabled ? '非表示にしました' : '表示にしました');
+    load();
+  };
+
+  const changePlacement = async (ad: AdBanner, next: Placement) => {
+    await api.patch(`/ads/${ad.id}`, { placement: next });
+    toast('表示先を変更しました');
     load();
   };
 
@@ -44,6 +56,7 @@ export default function AdBanners() {
     await api.post('/ads', {
       imageUrl: imageUrl.trim(),
       linkUrl: linkUrl.trim(),
+      placement,
       enabled: true,
       sortOrder: Number(sortOrder) || 0,
     });
@@ -51,6 +64,7 @@ export default function AdBanners() {
     setShowCreate(false);
     setImageUrl('');
     setLinkUrl('');
+    setPlacement('home');
     setSortOrder('0');
     load();
   };
@@ -59,7 +73,7 @@ export default function AdBanners() {
     <div>
       <h1 className="page-title">広告管理</h1>
       <p style={{ color: 'var(--text-secondary, #666)', marginTop: -8, marginBottom: 16 }}>
-        Userアプリのホーム画面に表示するバナー広告です。有効なものが複数ある場合は自動でローテーション表示されます。
+        Userアプリの各画面に表示するバナー広告です。表示先ごとに、有効なものが複数あれば自動でローテーション表示されます。
       </p>
       <div className="filter-row">
         <button className="btn btn-primary" style={{ marginLeft: 'auto' }} onClick={() => setShowCreate(true)}>
@@ -70,6 +84,7 @@ export default function AdBanners() {
         <thead>
           <tr>
             <th>プレビュー</th>
+            <th>表示先</th>
             <th>リンク先</th>
             <th>表示順</th>
             <th>状態</th>
@@ -81,6 +96,20 @@ export default function AdBanners() {
             <tr key={ad.id}>
               <td>
                 <img src={ad.image_url} alt="banner" style={{ width: 160, height: 43, objectFit: 'cover', borderRadius: 6 }} />
+              </td>
+              <td>
+                <select
+                  className="input"
+                  style={{ padding: '4px 8px' }}
+                  value={ad.placement}
+                  onChange={(e) => changePlacement(ad, e.target.value as Placement)}
+                >
+                  {(Object.keys(PLACEMENT_LABEL) as Placement[]).map((p) => (
+                    <option key={p} value={p}>
+                      {PLACEMENT_LABEL[p]}
+                    </option>
+                  ))}
+                </select>
               </td>
               <td style={{ maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis' }}>{ad.link_url || '-'}</td>
               <td>{ad.sort_order}</td>
@@ -104,6 +133,14 @@ export default function AdBanners() {
         <Modal onClose={() => setShowCreate(false)}>
           <form onSubmit={create}>
             <div className="modal-title">バナーを追加</div>
+            <label className="field-label">表示先</label>
+            <select className="input" style={{ width: '100%' }} value={placement} onChange={(e) => setPlacement(e.target.value as Placement)}>
+              {(Object.keys(PLACEMENT_LABEL) as Placement[]).map((p) => (
+                <option key={p} value={p}>
+                  {PLACEMENT_LABEL[p]}
+                </option>
+              ))}
+            </select>
             <label className="field-label">画像URL</label>
             <input
               className="input"

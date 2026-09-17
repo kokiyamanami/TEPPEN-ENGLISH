@@ -188,7 +188,7 @@ export const STUDY_CATEGORIES = [
 ];
 export const STUDY_SUBCATEGORIES = ['単語暗記', '文法問題', 'リスニング教材', 'シャドーイング', 'MYフレーズ復習', 'その他'];
 
-export type StudyLogEntry = { category: string; subcategories: string[]; minutes: number; memo: string };
+export type StudyLogEntry = { id?: number; category: string; subcategories: string[]; minutes: number; memo: string };
 
 export const studyLogEntries: Record<string, StudyLogEntry> = {};
 personalDailyStats.forEach((x) => {

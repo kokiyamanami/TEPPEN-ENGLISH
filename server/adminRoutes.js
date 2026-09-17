@@ -365,21 +365,25 @@ router.get('/ads', (req, res) => {
 });
 
 router.post('/ads', (req, res) => {
-  const { imageUrl, linkUrl = '', enabled = true, sortOrder = 0 } = req.body || {};
+  const { imageUrl, linkUrl = '', placement = 'home', enabled = true, sortOrder = 0 } = req.body || {};
   if (!imageUrl) return res.status(400).json({ error: 'imageUrl is required' });
   const info = db
-    .prepare('INSERT INTO ad_banners (image_url, link_url, enabled, sort_order, created_at) VALUES (?, ?, ?, ?, ?)')
-    .run(imageUrl, linkUrl, enabled ? 1 : 0, sortOrder, new Date().toISOString().slice(0, 10));
+    .prepare('INSERT INTO ad_banners (image_url, link_url, placement, enabled, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(imageUrl, linkUrl, placement, enabled ? 1 : 0, sortOrder, new Date().toISOString().slice(0, 10));
   res.json({ id: info.lastInsertRowid });
 });
 
 router.patch('/ads/:id', (req, res) => {
-  const { imageUrl, linkUrl, enabled, sortOrder } = req.body || {};
+  const { imageUrl, linkUrl, placement, enabled, sortOrder } = req.body || {};
   db.prepare(
-    'UPDATE ad_banners SET image_url = COALESCE(?, image_url), link_url = COALESCE(?, link_url), enabled = COALESCE(?, enabled), sort_order = COALESCE(?, sort_order) WHERE id = ?'
+    `UPDATE ad_banners SET
+      image_url = COALESCE(?, image_url), link_url = COALESCE(?, link_url), placement = COALESCE(?, placement),
+      enabled = COALESCE(?, enabled), sort_order = COALESCE(?, sort_order)
+     WHERE id = ?`
   ).run(
     imageUrl ?? null,
     linkUrl ?? null,
+    placement ?? null,
     enabled === undefined ? null : enabled ? 1 : 0,
     sortOrder === undefined ? null : sortOrder,
     req.params.id

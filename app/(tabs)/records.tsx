@@ -26,7 +26,7 @@ import { useProfile } from '../../src/store/ProfileContext';
 import { colors, radius, spacing } from '../../src/theme/colors';
 import { dateKey, formatMin, shortMd } from '../../src/utils/dateHelpers';
 
-type MobileRecord = { date: string; study_min: number; speak_min: number; category: string | null; subcategories: string[]; memo: string | null };
+type MobileRecord = { id: number; date: string; study_min: number; speak_min: number; category: string | null; subcategories: string[]; memo: string | null };
 
 function isoDate(d: Date): string {
   const y = d.getFullYear();
@@ -47,7 +47,7 @@ export default function RecordsScreen() {
   const [offset, setOffset] = useState<Record<RecordPeriod, number>>({ day: 0, week: 0, month: 0, all: 0 });
   const [selected, setSelected] = useState<Record<RecordPeriod, number | null>>({ day: null, week: null, month: null, all: 0 });
 
-  const [entries, setEntries] = useState<Record<string, StudyLogEntry>>({});
+  const [entries, setEntries] = useState<Record<string, StudyLogEntry[]>>({});
   const [personalData, setPersonalData] = useState<DailyStat[]>([]);
   const [calMonth, setCalMonth] = useState(new Date());
   const [sheetVisible, setSheetVisible] = useState(false);
@@ -55,20 +55,25 @@ export default function RecordsScreen() {
 
   const loadRecords = useCallback(() => {
     apiGet<MobileRecord[]>('/records').then((rows) => {
-      const nextEntries: Record<string, StudyLogEntry> = {};
-      const nextData: DailyStat[] = [];
+      const nextEntries: Record<string, StudyLogEntry[]> = {};
+      const dailyTotals: Record<string, DailyStat> = {};
       rows.forEach((r) => {
         const [y, m, d] = r.date.split('-').map(Number);
         const dt = new Date(y, m - 1, d);
-        nextEntries[dateKey(dt)] = {
+        const key = dateKey(dt);
+        (nextEntries[key] ??= []).push({
+          id: r.id,
           category: r.category || 'other',
           subcategories: r.subcategories,
           minutes: r.study_min,
           memo: r.memo || '',
-        };
-        nextData.push({ date: dt, studyMin: r.study_min, speakMin: r.speak_min });
+        });
+        // 同じ日に複数件登録されていても、グラフ/カレンダー用には1日分に合算する
+        if (!dailyTotals[key]) dailyTotals[key] = { date: dt, studyMin: 0, speakMin: 0 };
+        dailyTotals[key].studyMin += r.study_min;
+        dailyTotals[key].speakMin += r.speak_min;
       });
-      nextData.sort((a, b) => a.date.getTime() - b.date.getTime());
+      const nextData = Object.values(dailyTotals).sort((a, b) => a.date.getTime() - b.date.getTime());
       setEntries(nextEntries);
       setPersonalData(nextData);
     });
@@ -97,8 +102,8 @@ export default function RecordsScreen() {
 
   const saveEntry = async (entry: StudyLogEntry) => {
     if (!sheetDate) return;
-    setSheetVisible(false);
     await apiPost('/records', {
+      id: entry.id,
       date: isoDate(sheetDate),
       category: entry.category,
       subcategories: entry.subcategories,
@@ -108,10 +113,8 @@ export default function RecordsScreen() {
     loadRecords();
   };
 
-  const deleteEntry = async () => {
-    if (!sheetDate) return;
-    setSheetVisible(false);
-    await apiDelete(`/records/${isoDate(sheetDate)}`);
+  const deleteEntry = async (id: number) => {
+    await apiDelete(`/records/${id}`);
     loadRecords();
   };
 
@@ -266,8 +269,9 @@ export default function RecordsScreen() {
 
       <DaySheet
         visible={sheetVisible}
-        dateLabel={sheetDate ? `${shortMd(sheetDate)}（${['日', '月', '火', '水', '木', '金', '土'][sheetDate.getDay()]}）` : ''}
-        existing={sheetDate ? entries[dateKey(sheetDate)] ?? null : null}
+        date={sheetDate}
+        entries={sheetDate ? entries[dateKey(sheetDate)] ?? [] : []}
+        onChangeDate={setSheetDate}
         onCancel={() => setSheetVisible(false)}
         onSave={saveEntry}
         onDelete={deleteEntry}

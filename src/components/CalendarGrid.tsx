@@ -14,7 +14,7 @@ export function CalendarGrid({
   onSelectDay,
 }: {
   month: Date;
-  entries: Record<string, StudyLogEntry>;
+  entries: Record<string, StudyLogEntry[]>;
   onPrevMonth: () => void;
   onNextMonth: () => void;
   onSelectDay: (d: Date) => void;
@@ -60,16 +60,17 @@ export function CalendarGrid({
             cellDate.setHours(0, 0, 0, 0);
             const isFuture = cellDate > today;
             const isToday = cellDate.getTime() === today.getTime();
-            const entry = entries[dateKey(cellDate)];
+            const dayEntries = entries[dateKey(cellDate)];
+            const hasData = !!dayEntries?.length;
             return (
               <Pressable
                 key={i}
-                style={[styles.cell, entry && styles.cellHasData, isToday && styles.cellToday]}
+                style={[styles.cell, hasData && styles.cellHasData, isToday && styles.cellToday]}
                 disabled={isFuture}
                 onPress={() => onSelectDay(cellDate)}
               >
-                <Text style={[styles.cellText, entry && styles.cellTextData, isFuture && styles.cellTextFuture]}>{d}</Text>
-                {entry ? <View style={styles.dot} /> : null}
+                <Text style={[styles.cellText, hasData && styles.cellTextData, isFuture && styles.cellTextFuture]}>{d}</Text>
+                {hasData ? <View style={styles.dot} /> : null}
               </Pressable>
             );
           })}

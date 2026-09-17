@@ -151,16 +151,18 @@ router.get('/lectures', (req, res) => {
 
 // ---- ad banners（管理画面で自由に設定できるバナー広告） ----
 router.get('/ad-banners', (req, res) => {
+  const placement = req.query.placement || 'home';
   const rows = db
-    .prepare('SELECT id, image_url, link_url FROM ad_banners WHERE enabled = 1 ORDER BY sort_order, id')
-    .all();
+    .prepare('SELECT id, image_url, link_url FROM ad_banners WHERE enabled = 1 AND placement = ? ORDER BY sort_order, id')
+    .all(placement);
   res.json(rows.map((r) => ({ id: r.id, imageUrl: r.image_url, linkUrl: r.link_url || '' })));
 });
 
 // ---- study records (records画面のカレンダー/グラフ用) ----
+// 1日に複数件の学習記録を登録できる（同じdateのstudent_id×日付は一意ではない）
 router.get('/records', (req, res) => {
   const rows = db
-    .prepare('SELECT date, study_min, speak_min, category, subcategories, memo FROM speaking_stats WHERE student_id = ? ORDER BY date')
+    .prepare('SELECT id, date, study_min, speak_min, category, subcategories, memo FROM speaking_stats WHERE student_id = ? ORDER BY date, id')
     .all(req.studentId);
   res.json(
     rows.map((r) => ({
@@ -171,29 +173,28 @@ router.get('/records', (req, res) => {
 });
 
 router.post('/records', (req, res) => {
-  const { date, category, subcategories = [], minutes = 0, memo = '' } = req.body || {};
+  const { id, date, category, subcategories = [], minutes = 0, memo = '' } = req.body || {};
   if (!date) return res.status(400).json({ error: 'date is required' });
   const speakMin = category === 'speaking' ? minutes : Math.round(minutes * 0.3);
-  const existing = db.prepare('SELECT id FROM speaking_stats WHERE student_id = ? AND date = ?').get(req.studentId, date);
+
+  // idが指定され、自分の記録であれば更新。それ以外は常に新規追加（同日複数件を許可）
+  const existing = id ? db.prepare('SELECT id FROM speaking_stats WHERE id = ? AND student_id = ?').get(id, req.studentId) : null;
   if (existing) {
-    db.prepare('UPDATE speaking_stats SET study_min = ?, speak_min = ?, category = ?, subcategories = ?, memo = ? WHERE id = ?').run(
-      minutes,
-      speakMin,
-      category,
-      JSON.stringify(subcategories),
-      memo,
-      existing.id
-    );
-  } else {
     db.prepare(
-      'INSERT INTO speaking_stats (student_id, date, study_min, speak_min, category, subcategories, memo) VALUES (?, ?, ?, ?, ?, ?, ?)'
-    ).run(req.studentId, date, minutes, speakMin, category, JSON.stringify(subcategories), memo);
+      'UPDATE speaking_stats SET date = ?, study_min = ?, speak_min = ?, category = ?, subcategories = ?, memo = ? WHERE id = ?'
+    ).run(date, minutes, speakMin, category, JSON.stringify(subcategories), memo, existing.id);
+    return res.json({ ok: true, id: existing.id });
   }
-  res.json({ ok: true });
+  const info = db
+    .prepare(
+      'INSERT INTO speaking_stats (student_id, date, study_min, speak_min, category, subcategories, memo) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    )
+    .run(req.studentId, date, minutes, speakMin, category, JSON.stringify(subcategories), memo);
+  res.json({ ok: true, id: info.lastInsertRowid });
 });
 
-router.delete('/records/:date', (req, res) => {
-  db.prepare('DELETE FROM speaking_stats WHERE student_id = ? AND date = ?').run(req.studentId, req.params.date);
+router.delete('/records/:id', (req, res) => {
+  db.prepare('DELETE FROM speaking_stats WHERE id = ? AND student_id = ?').run(req.params.id, req.studentId);
   res.json({ ok: true });
 });
 

@@ -13,15 +13,15 @@ function resolveImageUri(url: string) {
 }
 
 // 管理画面の「広告管理」で登録したバナーを表示。有効なものが複数あれば自動でローテーション
-export function AdBanner() {
+export function AdBanner({ placement = 'home' }: { placement?: 'home' | 'talk' | 'mypage' }) {
   const [ads, setAds] = useState<AdBannerData[]>([]);
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
-    apiGet<AdBannerData[]>('/ad-banners')
+    apiGet<AdBannerData[]>(`/ad-banners?placement=${placement}`)
       .then(setAds)
       .catch(() => setAds([]));
-  }, []);
+  }, [placement]);
 
   useEffect(() => {
     if (ads.length < 2) return;

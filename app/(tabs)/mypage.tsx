@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { AdBanner } from '../../src/components/AdBanner';
 import { ScreenHeader } from '../../src/components/ScreenHeader';
 import { BACKEND_URL } from '../../src/config/api';
 import { MOCK_TOTAL_STUDY_MINUTES, getCurrentAltitudeM } from '../../src/data/mockHome';
@@ -25,10 +26,16 @@ const FIELD_ROWS: { key: keyof ReturnType<typeof useProfile>['profile']; label: 
 
 // screen key: mypage
 export default function MyPageScreen() {
-  const { profile, avatarUrl } = useProfile();
+  const { profile, avatarUrl, loadProfile } = useProfile();
   const { logout } = useSession();
   const [logoutOpen, setLogoutOpen] = useState(false);
   const altitudeM = getCurrentAltitudeM(MOCK_TOTAL_STUDY_MINUTES);
+
+  // オンボーディング直後など、コンテキストに古い/空のプロフィールが残っている場合に備えて
+  // マイページ表示時に必ずサーバーの最新状態で上書きする
+  useEffect(() => {
+    loadProfile().catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <ScrollView style={styles.screen}>
@@ -70,19 +77,13 @@ export default function MyPageScreen() {
           <Text style={styles.navRowLabel}>過去の所属グループ</Text>
           <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
         </Pressable>
+        <Pressable style={[styles.navRow, styles.navRowBordered]} onPress={() => router.push('/plans')}>
+          <Text style={styles.navRowLabel}>有料プランについて</Text>
+          <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
+        </Pressable>
       </View>
 
-      <Pressable style={styles.planBanner} onPress={() => router.push('/plans')}>
-        <View style={styles.planMark}>
-          <Ionicons name="flag" size={18} color={colors.white} />
-        </View>
-        <View style={styles.planBody}>
-          <Text style={styles.planEyebrow}>PLAN</Text>
-          <Text style={styles.planTitle}>有料プランのご案内</Text>
-          <Text style={styles.planSub}>990円プラン・TEPPEN ENGLISHコーチングも</Text>
-        </View>
-        <Ionicons name="chevron-forward" size={18} color={colors.white} />
-      </Pressable>
+      <AdBanner placement="mypage" />
 
       <Pressable style={styles.logoutRow} onPress={() => setLogoutOpen(true)}>
         <Text style={styles.logoutText}>ログアウト</Text>
@@ -144,12 +145,6 @@ const styles = StyleSheet.create({
   navRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.md },
   navRowBordered: { borderTopWidth: 1, borderTopColor: colors.border },
   navRowLabel: { fontSize: 13, color: colors.textPrimary, fontWeight: '600' },
-  planBanner: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginHorizontal: spacing.lg, marginTop: spacing.lg, backgroundColor: colors.coral, borderRadius: radius.md, padding: spacing.md },
-  planMark: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
-  planBody: { flex: 1 },
-  planEyebrow: { color: colors.white, fontSize: 9, opacity: 0.85 },
-  planTitle: { color: colors.white, fontWeight: '700', fontSize: 13, marginTop: 2 },
-  planSub: { color: colors.white, fontSize: 10, marginTop: 2, opacity: 0.9 },
   logoutRow: { alignItems: 'center', paddingVertical: spacing.xl },
   logoutText: { color: colors.danger, fontSize: 13, fontWeight: '600' },
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', padding: spacing.lg },

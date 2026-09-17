@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS students (
   avatar_url TEXT
 );
 
+-- 1日に複数件登録できるよう、student_id×dateのUNIQUE制約は付けない
 CREATE TABLE IF NOT EXISTS speaking_stats (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   student_id INTEGER REFERENCES students(id),
@@ -52,8 +53,7 @@ CREATE TABLE IF NOT EXISTS speaking_stats (
   speak_min INTEGER NOT NULL,
   category TEXT,
   subcategories TEXT,
-  memo TEXT,
-  UNIQUE(student_id, date)
+  memo TEXT
 );
 
 CREATE TABLE IF NOT EXISTS phrase_folders (
@@ -146,6 +146,7 @@ CREATE TABLE IF NOT EXISTS ad_banners (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   image_url TEXT NOT NULL,
   link_url TEXT,
+  placement TEXT NOT NULL DEFAULT 'home',
   enabled INTEGER NOT NULL DEFAULT 1,
   sort_order INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL
@@ -162,6 +163,32 @@ if (!studentCols.includes('onboarding_complete')) {
 }
 if (!studentCols.includes('avatar_url')) {
   db.exec('ALTER TABLE students ADD COLUMN avatar_url TEXT');
+}
+const adBannerCols = db.prepare('PRAGMA table_info(ad_banners)').all().map((c) => c.name);
+if (!adBannerCols.includes('placement')) {
+  db.exec("ALTER TABLE ad_banners ADD COLUMN placement TEXT NOT NULL DEFAULT 'home'");
+}
+
+// speaking_statsに旧UNIQUE(student_id, date)制約が残っている場合、1日複数件を許可するため
+// 制約なしの新テーブルへ作り直す（SQLiteはALTER TABLEで制約を削除できないため）
+const speakingStatsSql = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'speaking_stats'").get();
+if (speakingStatsSql && speakingStatsSql.sql.includes('UNIQUE')) {
+  db.exec(`
+    CREATE TABLE speaking_stats_new (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      student_id INTEGER REFERENCES students(id),
+      date TEXT NOT NULL,
+      study_min INTEGER NOT NULL,
+      speak_min INTEGER NOT NULL,
+      category TEXT,
+      subcategories TEXT,
+      memo TEXT
+    );
+    INSERT INTO speaking_stats_new (id, student_id, date, study_min, speak_min, category, subcategories, memo)
+      SELECT id, student_id, date, study_min, speak_min, category, subcategories, memo FROM speaking_stats;
+    DROP TABLE speaking_stats;
+    ALTER TABLE speaking_stats_new RENAME TO speaking_stats;
+  `);
 }
 
 function addDaysStr(days) {
