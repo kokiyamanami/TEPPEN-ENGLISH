@@ -39,6 +39,20 @@ export const emptyProfile: Profile = {
 
 type MeResponse = { profile: Partial<Profile>; onboardingStep: string; onboardingComplete: boolean; avatarUrl: string };
 
+const ARRAY_FIELDS: (keyof Profile)[] = ['job', 'position', 'hobby'];
+
+// 複数選択化する前に作られたアカウントは job/position/hobby が文字列で保存されている場合があるため、
+// サーバーから受け取った時点で必ず配列に正規化する（.filter/.join等での実行時エラーを防ぐ）
+function normalizeProfile(partial: Partial<Profile>): Partial<Profile> {
+  const normalized: Partial<Profile> = { ...partial };
+  ARRAY_FIELDS.forEach((key) => {
+    const value = normalized[key] as unknown;
+    if (Array.isArray(value)) return;
+    (normalized as Record<string, unknown>)[key] = value ? [String(value)] : [];
+  });
+  return normalized;
+}
+
 type ProfileContextValue = {
   profile: Profile;
   avatarUrl: string;
@@ -63,7 +77,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   // ログイン直後・アプリ再起動時にサーバーから最新プロフィールとオンボーディング進捗を取得
   const loadProfile = async () => {
     const res = await apiGet<MeResponse>('/me');
-    setProfile((prev) => ({ ...prev, ...res.profile }));
+    setProfile((prev) => ({ ...prev, ...normalizeProfile(res.profile) }));
     setAvatarUrl(res.avatarUrl || '');
     return { onboardingStep: res.onboardingStep, onboardingComplete: res.onboardingComplete };
   };
