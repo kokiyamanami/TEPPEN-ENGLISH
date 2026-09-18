@@ -128,6 +128,7 @@ CREATE TABLE IF NOT EXISTS announcements (
   title TEXT NOT NULL,
   body TEXT,
   target TEXT,
+  target_group_id INTEGER REFERENCES groups(id),
   status TEXT NOT NULL DEFAULT 'draft',
   created_at TEXT NOT NULL
 );
@@ -167,6 +168,10 @@ if (!studentCols.includes('avatar_url')) {
 const adBannerCols = db.prepare('PRAGMA table_info(ad_banners)').all().map((c) => c.name);
 if (!adBannerCols.includes('placement')) {
   db.exec("ALTER TABLE ad_banners ADD COLUMN placement TEXT NOT NULL DEFAULT 'home'");
+}
+const announcementCols = db.prepare('PRAGMA table_info(announcements)').all().map((c) => c.name);
+if (!announcementCols.includes('target_group_id')) {
+  db.exec('ALTER TABLE announcements ADD COLUMN target_group_id INTEGER REFERENCES groups(id)');
 }
 
 // speaking_statsに旧UNIQUE(student_id, date)制約が残っている場合、1日複数件を許可するため

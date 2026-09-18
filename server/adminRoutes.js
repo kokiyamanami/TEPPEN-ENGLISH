@@ -158,6 +158,42 @@ router.patch('/students/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+// CSV一括登録: [{ name, email?, phone?, groupId? }, ...] を受け取り、1件ずつ挿入する
+// （メール重複は行単位でスキップし、どの行が失敗したかをresultsで返す）
+router.post('/students/bulk', (req, res) => {
+  const { rows } = req.body || {};
+  if (!Array.isArray(rows) || rows.length === 0) return res.status(400).json({ error: 'rows is required' });
+
+  const insert = db.prepare(
+    'INSERT INTO students (name, email, phone, group_id, phase, status, last_login) VALUES (?, ?, ?, ?, 1, ?, ?)'
+  );
+  const results = rows.map((row, i) => {
+    const name = (row.name || '').trim();
+    if (!name) return { row: i + 1, ok: false, error: '氏名が空です' };
+    const email = (row.email || '').trim() || null;
+    try {
+      const info = insert.run(name, email, row.phone || '', row.groupId || null, 'active', new Date().toISOString().slice(0, 10));
+      return { row: i + 1, ok: true, id: info.lastInsertRowid };
+    } catch (err) {
+      const msg = String(err.message).includes('UNIQUE') ? 'メールアドレスが重複しています' : String(err.message);
+      return { row: i + 1, ok: false, error: msg };
+    }
+  });
+  res.json({ results, createdCount: results.filter((r) => r.ok).length });
+});
+
+// 複数生徒のステータス一括変更
+router.post('/students/bulk-status', (req, res) => {
+  const { ids, status } = req.body || {};
+  if (!Array.isArray(ids) || ids.length === 0 || !status) return res.status(400).json({ error: 'ids and status are required' });
+  const update = db.prepare('UPDATE students SET status = ? WHERE id = ?');
+  const tx = db.transaction((studentIds) => {
+    studentIds.forEach((id) => update.run(status, id));
+  });
+  tx(ids);
+  res.json({ ok: true, updatedCount: ids.length });
+});
+
 router.get('/students/:id', (req, res) => {
   const student = db
     .prepare(`SELECT s.id, s.name, s.email, s.phone, s.group_id, s.phase, s.status, s.last_login, s.avatar_url, g.name as group_name FROM students s LEFT JOIN groups g ON g.id = s.group_id WHERE s.id = ?`)
@@ -310,6 +346,29 @@ router.get('/coaches', (req, res) => {
   res.json(db.prepare('SELECT * FROM coaches ORDER BY id').all());
 });
 
+router.post('/coaches', (req, res) => {
+  const { name, email = '', specialty = '' } = req.body || {};
+  if (!name) return res.status(400).json({ error: 'name is required' });
+  const info = db.prepare('INSERT INTO coaches (name, email, specialty) VALUES (?, ?, ?)').run(name, email, specialty);
+  res.json({ id: info.lastInsertRowid });
+});
+
+router.patch('/coaches/:id', (req, res) => {
+  const { name, email, specialty } = req.body || {};
+  db.prepare('UPDATE coaches SET name = COALESCE(?, name), email = COALESCE(?, email), specialty = COALESCE(?, specialty) WHERE id = ?').run(
+    name ?? null,
+    email ?? null,
+    specialty ?? null,
+    req.params.id
+  );
+  res.json({ ok: true });
+});
+
+router.delete('/coaches/:id', (req, res) => {
+  db.prepare('DELETE FROM coaches WHERE id = ?').run(req.params.id);
+  res.json({ ok: true });
+});
+
 // ---- materials ----
 router.get('/materials', (req, res) => {
   res.json(db.prepare('SELECT * FROM materials ORDER BY id DESC').all());
@@ -335,23 +394,40 @@ router.patch('/materials/:id', (req, res) => {
 
 // ---- announcements ----
 router.get('/announcements', (req, res) => {
-  res.json(db.prepare('SELECT * FROM announcements ORDER BY id DESC').all());
+  res.json(
+    db
+      .prepare(
+        `SELECT a.*, g.name as target_group_name FROM announcements a
+         LEFT JOIN groups g ON g.id = a.target_group_id
+         ORDER BY a.id DESC`
+      )
+      .all()
+  );
 });
 
 router.post('/announcements', (req, res) => {
-  const { title, body, target = '全生徒', status = 'draft' } = req.body || {};
+  const { title, body, target = '全生徒', targetGroupId = null, status = 'draft' } = req.body || {};
   if (!title) return res.status(400).json({ error: 'title is required' });
+  if (target === '特定グループ' && !targetGroupId) return res.status(400).json({ error: 'targetGroupId is required' });
   const info = db
-    .prepare('INSERT INTO announcements (title, body, target, status, created_at) VALUES (?, ?, ?, ?, ?)')
-    .run(title, body, target, status, new Date().toISOString().slice(0, 10));
+    .prepare('INSERT INTO announcements (title, body, target, target_group_id, status, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(title, body, target, target === '特定グループ' ? targetGroupId : null, status, new Date().toISOString().slice(0, 10));
   res.json({ id: info.lastInsertRowid });
 });
 
 router.patch('/announcements/:id', (req, res) => {
-  const { status, title, body } = req.body || {};
+  const body = req.body || {};
+  const { status, title } = body;
   db.prepare(
     'UPDATE announcements SET status = COALESCE(?, status), title = COALESCE(?, title), body = COALESCE(?, body) WHERE id = ?'
-  ).run(status ?? null, title ?? null, body ?? null, req.params.id);
+  ).run(status ?? null, title ?? null, body.body ?? null, req.params.id);
+  if (Object.prototype.hasOwnProperty.call(body, 'target')) {
+    db.prepare('UPDATE announcements SET target = ?, target_group_id = ? WHERE id = ?').run(
+      body.target,
+      body.target === '特定グループ' ? body.targetGroupId ?? null : null,
+      req.params.id
+    );
+  }
   res.json({ ok: true });
 });
 

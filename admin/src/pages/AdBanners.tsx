@@ -32,6 +32,8 @@ export default function AdBanners() {
   const toast = useToast();
   const [ads, setAds] = useState<AdBanner[]>([]);
   const [filter, setFilter] = useState<Placement | 'all'>('all');
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [showEdit, setShowEdit] = useState<AdBanner | 'new' | null>(null);
   const [imageUrl, setImageUrl] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -39,7 +41,13 @@ export default function AdBanners() {
   const [placement, setPlacement] = useState<Placement>('home');
   const [sortOrder, setSortOrder] = useState('0');
 
-  const filteredAds = filter === 'all' ? ads : ads.filter((a) => a.placement === filter);
+  const filteredAds = ads.filter((a) => {
+    if (filter !== 'all' && a.placement !== filter) return false;
+    if (search && !(a.link_url || '').toLowerCase().includes(search.toLowerCase())) return false;
+    if (statusFilter === 'enabled' && !a.enabled) return false;
+    if (statusFilter === 'disabled' && a.enabled) return false;
+    return true;
+  });
   const { page, setPage, totalPages, pageItems: visibleAds, total } = usePagination(filteredAds);
 
   const load = () => api.get<AdBanner[]>('/ads').then(setAds);
@@ -135,6 +143,14 @@ export default function AdBanners() {
           ＋ バナーを追加
         </button>
       </div>
+      <div className="filter-row">
+        <input className="input" placeholder="リンク先URLで検索" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <select className="input" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+          <option value="">全ステータス</option>
+          <option value="enabled">表示中</option>
+          <option value="disabled">非表示</option>
+        </select>
+      </div>
       {filter !== 'all' && (
         <p style={{ color: 'var(--text-secondary, #666)', fontSize: 13, marginTop: -4, marginBottom: 12 }}>{PLACEMENT_DESC[filter]}</p>
       )}
@@ -194,6 +210,13 @@ export default function AdBanners() {
               </td>
             </tr>
           ))}
+          {visibleAds.length === 0 && (
+            <tr>
+              <td colSpan={6} style={{ color: 'var(--text-secondary)' }}>
+                該当するバナーがありません
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
       <Pagination page={page} totalPages={totalPages} total={total} onChange={setPage} />

@@ -41,7 +41,15 @@ function extractYoutubeId(input: string): string {
 export default function Lectures() {
   const toast = useToast();
   const [lectures, setLectures] = useState<Lecture[]>([]);
-  const { page, setPage, totalPages, pageItems, total } = usePagination(lectures);
+  const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const categories = Array.from(new Set(lectures.map((l) => l.category).filter(Boolean)));
+  const filtered = lectures.filter((l) => {
+    if (search && !l.title.toLowerCase().includes(search.toLowerCase())) return false;
+    if (categoryFilter && l.category !== categoryFilter) return false;
+    return true;
+  });
+  const { page, setPage, totalPages, pageItems, total } = usePagination(filtered);
   const [showEdit, setShowEdit] = useState<Lecture | 'new' | null>(null);
   const [youtubeId, setYoutubeId] = useState('');
   const [title, setTitle] = useState('');
@@ -102,6 +110,15 @@ export default function Lectures() {
         Userアプリのトレーニング「動画」カテゴリに表示するYouTube動画です。YouTubeの動画IDはURLの v= の後ろの部分です。
       </p>
       <div className="filter-row">
+        <input className="input" placeholder="タイトルで検索" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <select className="input" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+          <option value="">全カテゴリ</option>
+          {categories.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
         <button className="btn btn-primary" style={{ marginLeft: 'auto' }} onClick={openNew}>
           ＋ 動画を追加
         </button>
@@ -139,6 +156,13 @@ export default function Lectures() {
               </td>
             </tr>
           ))}
+          {pageItems.length === 0 && (
+            <tr>
+              <td colSpan={5} style={{ color: 'var(--text-secondary)' }}>
+                該当する動画がありません
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
       <Pagination page={page} totalPages={totalPages} total={total} onChange={setPage} />
