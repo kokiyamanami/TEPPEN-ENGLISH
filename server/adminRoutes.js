@@ -165,7 +165,8 @@ router.get('/students/:id', (req, res) => {
 });
 
 router.post('/students/:id/phase', (req, res) => {
-  const { phase, date, listening, accuracy, fluency, clarity } = req.body || {};
+  const { phase, date, listening = 0, accuracy = 0, fluency = 0, clarity = 0 } = req.body || {};
+  if (!phase) return res.status(400).json({ error: 'phase is required' });
   db.prepare(
     'INSERT INTO phase_history (student_id, phase, date, listening, accuracy, fluency, clarity) VALUES (?, ?, ?, ?, ?, ?, ?)'
   ).run(req.params.id, phase, date || new Date().toISOString().slice(0, 10), listening, accuracy, fluency, clarity);
@@ -269,7 +270,8 @@ router.get('/groups/:id', (req, res) => {
 });
 
 router.post('/groups/:id/goals', (req, res) => {
-  const { weekStart, studyGoal, speakGoal } = req.body || {};
+  const { weekStart, studyGoal = 0, speakGoal = 0 } = req.body || {};
+  if (!weekStart) return res.status(400).json({ error: 'weekStart is required' });
   db.prepare('INSERT INTO group_goals (group_id, week_start, study_goal, speak_goal, achieved) VALUES (?, ?, ?, ?, 0)').run(
     req.params.id,
     weekStart,

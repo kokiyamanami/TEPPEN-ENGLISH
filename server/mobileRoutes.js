@@ -173,7 +173,7 @@ router.get('/records', (req, res) => {
 });
 
 router.post('/records', (req, res) => {
-  const { id, date, category, subcategories = [], minutes = 0, memo = '' } = req.body || {};
+  const { id, date, category = 'other', subcategories = [], minutes = 0, memo = '' } = req.body || {};
   if (!date) return res.status(400).json({ error: 'date is required' });
   const speakMin = category === 'speaking' ? minutes : Math.round(minutes * 0.3);
 
@@ -223,6 +223,8 @@ router.get('/phrases', (req, res) => {
 router.post('/phrases', (req, res) => {
   const { folderId, text, textJP = '' } = req.body || {};
   if (!folderId || !text) return res.status(400).json({ error: 'folderId and text are required' });
+  const folder = db.prepare('SELECT id FROM phrase_folders WHERE id = ? AND student_id = ?').get(folderId, req.studentId);
+  if (!folder) return res.status(404).json({ error: 'folder_not_found' });
   const info = db
     .prepare('INSERT INTO phrases (student_id, folder_id, text, text_jp, learned) VALUES (?, ?, ?, ?, 0)')
     .run(req.studentId, folderId, text, textJP);
