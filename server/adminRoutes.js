@@ -1,10 +1,17 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const multer = require('multer');
+const fs = require('fs');
+const path = require('path');
 const db = require('./db');
 
 const router = express.Router();
 const JWT_SECRET = process.env.ADMIN_JWT_SECRET || 'teppen-english-dev-secret';
+
+const AD_IMAGE_DIR = path.join(__dirname, 'public', 'ads');
+fs.mkdirSync(AD_IMAGE_DIR, { recursive: true });
+const adImageUpload = multer({ dest: '/tmp/teppen-uploads/' });
 
 function requireAuth(req, res, next) {
   const header = req.headers.authorization || '';
@@ -364,6 +371,30 @@ router.delete('/lectures/:id', (req, res) => {
 // ---- ad banners（モバイルアプリのホーム画面に表示するバナー広告） ----
 router.get('/ads', (req, res) => {
   res.json(db.prepare('SELECT * FROM ad_banners ORDER BY sort_order, id').all());
+});
+
+// バナー画像のアップロード。返ってきたurlをimageUrlとしてPOST/PATCH /adsに渡す
+router.post('/ads/upload', adImageUpload.single('image'), (req, res) => {
+  const file = req.file;
+  if (!file) return res.status(400).json({ error: 'image file is required' });
+  try {
+    const ext = (path.extname(file.originalname || '') || '.jpg').toLowerCase();
+    const safeExt = ['.jpg', '.jpeg', '.png', '.webp', '.gif'].includes(ext) ? ext : '.jpg';
+    const filename = `${Date.now()}-${Math.round(Math.random() * 1e6)}${safeExt}`;
+    const dest = path.join(AD_IMAGE_DIR, filename);
+    try {
+      fs.renameSync(file.path, dest);
+    } catch (renameErr) {
+      if (renameErr.code !== 'EXDEV') throw renameErr;
+      fs.copyFileSync(file.path, dest);
+      fs.unlink(file.path, () => {});
+    }
+    res.json({ url: `/ads/${filename}` });
+  } catch (err) {
+    console.error('ad image upload error:', err);
+    fs.unlink(file.path, () => {});
+    res.status(500).json({ error: 'upload_failed', detail: String(err.message || err) });
+  }
 });
 
 router.post('/ads', (req, res) => {

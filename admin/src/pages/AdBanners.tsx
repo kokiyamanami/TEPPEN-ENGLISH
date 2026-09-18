@@ -1,7 +1,11 @@
-import { FormEvent, useEffect, useState } from 'react';
-import { api } from '../api/client';
+import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
+import { api, BACKEND_URL, uploadFile } from '../api/client';
 import { Modal } from '../components/Modal';
 import { useToast } from '../context/ToastContext';
+
+function resolveUrl(url: string) {
+  return url.startsWith('http') ? url : `${BACKEND_URL}${url}`;
+}
 
 type Placement = 'home' | 'talk' | 'mypage';
 
@@ -26,8 +30,9 @@ export default function AdBanners() {
   const toast = useToast();
   const [ads, setAds] = useState<AdBanner[]>([]);
   const [filter, setFilter] = useState<Placement | 'all'>('all');
-  const [showCreate, setShowCreate] = useState(false);
+  const [showEdit, setShowEdit] = useState<AdBanner | 'new' | null>(null);
   const [imageUrl, setImageUrl] = useState('');
+  const [uploading, setUploading] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
   const [placement, setPlacement] = useState<Placement>('home');
   const [sortOrder, setSortOrder] = useState('0');
@@ -59,22 +64,49 @@ export default function AdBanners() {
     load();
   };
 
-  const create = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!imageUrl.trim()) return;
-    await api.post('/ads', {
-      imageUrl: imageUrl.trim(),
-      linkUrl: linkUrl.trim(),
-      placement,
-      enabled: true,
-      sortOrder: Number(sortOrder) || 0,
-    });
-    toast('バナーを追加しました');
-    setShowCreate(false);
+  const openNew = () => {
     setImageUrl('');
     setLinkUrl('');
     setPlacement('home');
-    setSortOrder('0');
+    setSortOrder(String(ads.length));
+    setShowEdit('new');
+  };
+
+  const openEdit = (ad: AdBanner) => {
+    setImageUrl(ad.image_url);
+    setLinkUrl(ad.link_url || '');
+    setPlacement(ad.placement);
+    setSortOrder(String(ad.sort_order));
+    setShowEdit(ad);
+  };
+
+  const onPickFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setUploading(true);
+    try {
+      const res = await uploadFile('/ads/upload', 'image', file);
+      setImageUrl(res.url);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'アップロードに失敗しました');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const save = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!imageUrl.trim()) return;
+    const payload = { imageUrl: imageUrl.trim(), linkUrl: linkUrl.trim(), placement, sortOrder: Number(sortOrder) || 0 };
+    if (showEdit === 'new') {
+      await api.post('/ads', { ...payload, enabled: true });
+      toast('バナーを追加しました');
+    } else if (showEdit) {
+      await api.patch(`/ads/${showEdit.id}`, payload);
+      toast('バナーを更新しました');
+    }
+    setShowEdit(null);
     load();
   };
 
@@ -96,7 +128,7 @@ export default function AdBanners() {
             {p === 'all' ? 'すべて' : PLACEMENT_LABEL[p]}
           </button>
         ))}
-        <button className="btn btn-primary" style={{ marginLeft: 'auto' }} onClick={() => setShowCreate(true)}>
+        <button className="btn btn-primary" style={{ marginLeft: 'auto' }} onClick={openNew}>
           ＋ バナーを追加
         </button>
       </div>
@@ -118,7 +150,12 @@ export default function AdBanners() {
           {visibleAds.map((ad) => (
             <tr key={ad.id}>
               <td>
-                <img src={ad.image_url} alt="banner" style={{ width: 160, height: 43, objectFit: 'cover', borderRadius: 6 }} />
+                <img
+                  src={resolveUrl(ad.image_url)}
+                  alt="banner"
+                  style={{ width: 160, height: 43, objectFit: 'cover', borderRadius: 6, cursor: 'pointer' }}
+                  onClick={() => openEdit(ad)}
+                />
               </td>
               <td>
                 <select
@@ -140,6 +177,9 @@ export default function AdBanners() {
                 <span className="tag">{ad.enabled ? '表示中' : '非表示'}</span>
               </td>
               <td style={{ display: 'flex', gap: 8 }}>
+                <button className="btn" style={{ padding: '4px 12px' }} onClick={() => openEdit(ad)}>
+                  編集
+                </button>
                 <button className="btn" style={{ padding: '4px 12px' }} onClick={() => toggleEnabled(ad)}>
                   {ad.enabled ? '非表示にする' : '表示する'}
                 </button>
@@ -152,10 +192,10 @@ export default function AdBanners() {
         </tbody>
       </table>
 
-      {showCreate && (
-        <Modal onClose={() => setShowCreate(false)}>
-          <form onSubmit={create}>
-            <div className="modal-title">バナーを追加</div>
+      {showEdit && (
+        <Modal onClose={() => setShowEdit(null)}>
+          <form onSubmit={save}>
+            <div className="modal-title">{showEdit === 'new' ? 'バナーを追加' : 'バナーを編集'}</div>
             <label className="field-label">表示先</label>
             <select className="input" style={{ width: '100%' }} value={placement} onChange={(e) => setPlacement(e.target.value as Placement)}>
               {(Object.keys(PLACEMENT_LABEL) as Placement[]).map((p) => (
@@ -164,7 +204,16 @@ export default function AdBanners() {
                 </option>
               ))}
             </select>
-            <label className="field-label">画像URL</label>
+
+            <label className="field-label">バナー画像</label>
+            {imageUrl && (
+              <img src={resolveUrl(imageUrl)} alt="preview" style={{ width: '100%', maxHeight: 120, objectFit: 'cover', borderRadius: 6, marginBottom: 8 }} />
+            )}
+            <input type="file" accept="image/*" onChange={onPickFile} disabled={uploading} />
+            {uploading && <div style={{ fontSize: 12, color: 'var(--text-secondary, #666)', marginTop: 4 }}>アップロード中…</div>}
+            <label className="field-label" style={{ marginTop: 12 }}>
+              画像URL（アップロードすると自動で入ります。外部URLを直接指定することも可能）
+            </label>
             <input
               className="input"
               style={{ width: '100%' }}
@@ -190,11 +239,11 @@ export default function AdBanners() {
               onChange={(e) => setSortOrder(e.target.value)}
             />
             <div className="modal-actions">
-              <button type="button" className="btn" onClick={() => setShowCreate(false)}>
+              <button type="button" className="btn" onClick={() => setShowEdit(null)}>
                 キャンセル
               </button>
-              <button type="submit" className="btn btn-primary">
-                追加
+              <button type="submit" className="btn btn-primary" disabled={uploading}>
+                {showEdit === 'new' ? '追加' : '保存'}
               </button>
             </div>
           </form>

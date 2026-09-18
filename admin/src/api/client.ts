@@ -33,4 +33,21 @@ export const api = {
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
 };
 
+// multipart/form-data用: Content-Typeを固定しないので、requestではなく独自にfetchする
+export async function uploadFile(path: string, field: string, file: File): Promise<{ url: string }> {
+  const token = getToken();
+  const formData = new FormData();
+  formData.append(field, file);
+  const res = await fetch(`${BACKEND_URL}/api/admin${path}`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    body: formData,
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `upload failed (${res.status})`);
+  }
+  return res.json();
+}
+
 export { getToken };
