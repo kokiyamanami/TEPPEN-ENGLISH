@@ -71,6 +71,22 @@ CREATE TABLE IF NOT EXISTS monthly_mission_results (
   date TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS daily_mission_results (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  student_id INTEGER REFERENCES students(id),
+  date TEXT NOT NULL,
+  type TEXT NOT NULL,
+  pass INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS weekly_mission_results (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  student_id INTEGER REFERENCES students(id),
+  week_start TEXT NOT NULL,
+  pass INTEGER NOT NULL,
+  date TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS phase_history (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   student_id INTEGER REFERENCES students(id),

@@ -14,7 +14,6 @@ import {
   RecordPeriod,
   RecordScope,
   StudyLogEntry,
-  buildUnifiedSpeakingLog,
   groupMembers,
   memberTotalForRankingPeriod,
   personalTotalForRankingPeriod,
@@ -23,6 +22,7 @@ import {
 } from '../../src/data/records';
 import { useGoals } from '../../src/store/GoalsContext';
 import { useProfile } from '../../src/store/ProfileContext';
+import { useSpeakingLog } from '../../src/hooks/useSpeakingLog';
 import { useStats } from '../../src/store/StatsContext';
 import { colors, radius, spacing } from '../../src/theme/colors';
 import { dateKey, formatMin, shortMd } from '../../src/utils/dateHelpers';
@@ -115,9 +115,9 @@ export default function RecordsScreen() {
     reloadStats();
   };
 
-  // TODO: Daily/Weeklyミッション結果・フリー練習ログの永続化テーブルが未実装のためモックのまま
-  // （Monthlyミッションのみ /api/mobile/monthly-mission でバックエンドと共有済み）
-  const speakingLog = useMemo(() => buildUnifiedSpeakingLog(), []);
+  // Daily/Weekly/Monthlyミッションの結果は実データ、フリー練習ログは
+  // 永続化テーブルが未実装のためまだモック（useSpeakingLog内でマージ）
+  const speakingLog = useSpeakingLog();
 
   // ---- ranking ----
   const rankingPeriodNoun = PERIOD_LABEL[period];

@@ -175,6 +175,19 @@ router.get('/study-summary', (req, res) => {
   res.json({ totalStudyMinutes: row.total });
 });
 
+// ---- announcements（公開済みで自分宛て「全生徒」または所属グループ宛てのもの） ----
+router.get('/announcements', (req, res) => {
+  const student = db.prepare('SELECT group_id FROM students WHERE id = ?').get(req.studentId);
+  const rows = db
+    .prepare(
+      `SELECT id, title, body, created_at FROM announcements
+       WHERE status = 'published' AND (target = '全生徒' OR (target = '特定グループ' AND target_group_id = ?))
+       ORDER BY id DESC`
+    )
+    .all(student?.group_id ?? -1);
+  res.json(rows);
+});
+
 // ---- study records (records画面のカレンダー/グラフ用) ----
 // 1日に複数件の学習記録を登録できる（同じdateのstudent_id×日付は一意ではない）
 router.get('/records', (req, res) => {
@@ -277,6 +290,83 @@ router.post('/monthly-mission', (req, res) => {
     );
   }
   res.json({ ok: true });
+});
+
+function mondayOfStr(d) {
+  const x = new Date(d);
+  const day = x.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  x.setDate(x.getDate() + diff);
+  return x.toISOString().slice(0, 10);
+}
+
+// ---- daily mission（type: 'photo' | 'question'、1日1件ずつ記録） ----
+router.post('/daily-mission', (req, res) => {
+  const { type, pass } = req.body || {};
+  if (!type) return res.status(400).json({ error: 'type is required' });
+  const date = todayStr();
+  const existing = db
+    .prepare('SELECT id FROM daily_mission_results WHERE student_id = ? AND date = ? AND type = ?')
+    .get(req.studentId, date, type);
+  if (existing) {
+    db.prepare('UPDATE daily_mission_results SET pass = ? WHERE id = ?').run(pass ? 1 : 0, existing.id);
+  } else {
+    db.prepare('INSERT INTO daily_mission_results (student_id, date, type, pass) VALUES (?, ?, ?, ?)').run(
+      req.studentId,
+      date,
+      type,
+      pass ? 1 : 0
+    );
+  }
+  res.json({ ok: true });
+});
+
+// ---- weekly mission（週の月曜日始まりで1件ずつ記録） ----
+router.post('/weekly-mission', (req, res) => {
+  const { pass } = req.body || {};
+  const weekStart = mondayOfStr(new Date());
+  const existing = db
+    .prepare('SELECT id FROM weekly_mission_results WHERE student_id = ? AND week_start = ?')
+    .get(req.studentId, weekStart);
+  if (existing) {
+    db.prepare('UPDATE weekly_mission_results SET pass = ?, date = ? WHERE id = ?').run(pass ? 1 : 0, todayStr(), existing.id);
+  } else {
+    db.prepare('INSERT INTO weekly_mission_results (student_id, week_start, pass, date) VALUES (?, ?, ?, ?)').run(
+      req.studentId,
+      weekStart,
+      pass ? 1 : 0,
+      todayStr()
+    );
+  }
+  res.json({ ok: true });
+});
+
+// ---- mission history（記録画面の「スピーキング履歴」表示用にまとめて取得） ----
+router.get('/mission-history', (req, res) => {
+  const daily = db
+    .prepare('SELECT date, type, pass FROM daily_mission_results WHERE student_id = ? ORDER BY date DESC')
+    .all(req.studentId);
+  const weekly = db
+    .prepare('SELECT week_start, pass, date FROM weekly_mission_results WHERE student_id = ? ORDER BY week_start DESC')
+    .all(req.studentId);
+  const monthly = db
+    .prepare('SELECT month, pass, date FROM monthly_mission_results WHERE student_id = ? ORDER BY month DESC')
+    .all(req.studentId);
+  res.json({ daily, weekly, monthly });
+});
+
+// ---- chat（コーチとのトーク。管理画面の生徒詳細から送るメッセージと同じテーブルを共有） ----
+router.get('/chat', (req, res) => {
+  res.json(db.prepare('SELECT id, sender, text, time FROM chat_messages WHERE student_id = ? ORDER BY id').all(req.studentId));
+});
+
+router.post('/chat', (req, res) => {
+  const { text } = req.body || {};
+  if (!text) return res.status(400).json({ error: 'text is required' });
+  const info = db
+    .prepare('INSERT INTO chat_messages (student_id, sender, text, time) VALUES (?, ?, ?, ?)')
+    .run(req.studentId, 'student', text, new Date().toISOString());
+  res.json({ id: info.lastInsertRowid });
 });
 
 module.exports = router;

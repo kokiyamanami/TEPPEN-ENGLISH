@@ -206,51 +206,12 @@ personalDailyStats.forEach((x) => {
 });
 
 // ---- unified speaking log ----
+// kind:'daily'|'weekly'|'monthly'は /api/mobile/mission-history の実データ、
+// kind:'other'（フリー練習）は永続化テーブルが未実装のためまだモック
 export type SpeakingLogItem = { date: Date; title: string; kind: 'other' | 'daily' | 'weekly' | 'monthly'; pass?: boolean };
 
-const speakingHistoryLog: SpeakingLogItem[] = Array.from({ length: 22 }).map((_, i) => {
+export const FREE_PRACTICE_LOG_MOCK: SpeakingLogItem[] = Array.from({ length: 22 }).map((_, i) => {
   const d = addDays(new Date(), -Math.floor(i * 1.4));
   d.setHours(8 + Math.floor(Math.random() * 14), Math.floor(Math.random() * 60));
   return { date: d, title: SPEAKING_LOG_TYPES[i % SPEAKING_LOG_TYPES.length] + (i % 5 === 0 ? ` DAY${89 - i}` : ''), kind: 'other' };
 });
-
-const dailyMissionResults = Array.from({ length: 10 }).map((_, idx) => {
-  const d = 10 - idx;
-  const day = addDays(new Date(), -d);
-  return { day: 99 - d, date: day, pass: Math.random() > 0.2, type: Math.random() > 0.5 ? 'photo' : 'question' };
-});
-
-const weeklyAssignmentResults = Array.from({ length: 8 }).map((_, idx) => {
-  const w = 8 - idx;
-  const monday = mondayOf(addDays(new Date(), -w * 7));
-  return { week: 14 - w, weekStart: monday, pass: Math.random() > 0.25 };
-});
-
-const monthlyMissionResults = Array.from({ length: 6 }).map((_, idx) => {
-  const m = 6 - idx;
-  const d = new Date();
-  d.setMonth(d.getMonth() - m, 1);
-  return { month: 8 - m, monthDate: d, pass: Math.random() > 0.2 };
-});
-
-export function buildUnifiedSpeakingLog(): SpeakingLogItem[] {
-  const daily: SpeakingLogItem[] = dailyMissionResults.map((d) => ({
-    date: d.date,
-    title: `Dailyミッション（${d.type === 'photo' ? '写真描写' : '質問回答'}）DAY${d.day}`,
-    kind: 'daily',
-    pass: d.pass,
-  }));
-  const weekly: SpeakingLogItem[] = weeklyAssignmentResults.map((w) => ({
-    date: w.weekStart,
-    title: `Weeklyミッション WEEK${w.week}`,
-    kind: 'weekly',
-    pass: w.pass,
-  }));
-  const monthly: SpeakingLogItem[] = monthlyMissionResults.map((m) => ({
-    date: m.monthDate,
-    title: `Monthlyミッション MONTH${m.month}`,
-    kind: 'monthly',
-    pass: m.pass,
-  }));
-  return [...speakingHistoryLog, ...daily, ...weekly, ...monthly].sort((a, b) => b.date.getTime() - a.date.getTime());
-}

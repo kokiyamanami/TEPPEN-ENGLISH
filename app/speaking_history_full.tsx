@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { TopBar } from '../src/components/TopBar';
-import { buildUnifiedSpeakingLog } from '../src/data/records';
+import { useSpeakingLog } from '../src/hooks/useSpeakingLog';
 import { colors, radius, spacing } from '../src/theme/colors';
 import { shortMd } from '../src/utils/dateHelpers';
 
@@ -13,7 +13,7 @@ const PASS_LABELS: Record<PassFilter, string> = { all: '全て', pass: '合格',
 
 // screen key: speaking_history_full
 export default function SpeakingHistoryFullScreen() {
-  const log = useMemo(() => buildUnifiedSpeakingLog(), []);
+  const log = useSpeakingLog();
   const [kindFilter, setKindFilter] = useState<KindFilter>('all');
   const [passFilter, setPassFilter] = useState<PassFilter>('all');
 
