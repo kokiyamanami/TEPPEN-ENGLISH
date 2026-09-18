@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { apiPost } from '../src/api/mobileAuth';
 import { submitForGrading } from '../src/api/grading';
 import { RecordCard } from '../src/components/RecordCard';
 import { ResultView } from '../src/components/ResultView';
@@ -29,9 +28,8 @@ export default function DailyTaskScreen() {
     if (!record.uri) return;
     setGrading(true);
     try {
-      const res = await submitForGrading(record.uri, mission.label, mission.prompt, mission.promptJP);
+      const res = await submitForGrading(record.uri, mission.label, mission.prompt, mission.promptJP, `daily:${missionType}`);
       setResult(res);
-      await apiPost('/daily-mission', { type: missionType, pass: res.pass }).catch(() => {});
     } catch (e) {
       Alert.alert('添削に失敗しました', 'サーバーに接続できませんでした。もう一度お試しください。');
     } finally {

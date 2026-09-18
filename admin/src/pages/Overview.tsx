@@ -56,7 +56,7 @@ export default function Overview() {
                       </Link>
                     </td>
                     <td>
-                      <span className="tag">{s.group_name}</span>
+                      <span className="tag">{s.group_name ?? '未所属'}</span>
                     </td>
                     <td style={{ textAlign: 'right', color: 'var(--text-secondary)' }}>{s.last_login}</td>
                   </tr>

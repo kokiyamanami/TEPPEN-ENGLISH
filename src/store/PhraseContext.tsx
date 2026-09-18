@@ -60,19 +60,15 @@ export function PhraseProvider({ children }: { children: ReactNode }) {
   const deleteFolder = async (id: number) => {
     setFolders((prev) => prev.filter((f) => f.id !== id));
     setPhrases((prev) => prev.filter((p) => p.folder_id !== id));
-    await apiDelete(`/phrase-folders/${id}`);
+    await apiDelete(`/phrase-folders/${id}`).catch(() => load().catch(() => {}));
   };
 
   const toggleLearned = async (id: number) => {
-    let nextLearned = 0;
-    setPhrases((prev) =>
-      prev.map((p) => {
-        if (p.id !== id) return p;
-        nextLearned = p.learned ? 0 : 1;
-        return { ...p, learned: nextLearned };
-      })
-    );
-    await apiPatch(`/phrases/${id}`, { learned: !!nextLearned });
+    const target = phrases.find((p) => p.id === id);
+    if (!target) return;
+    const nextLearned = target.learned ? 0 : 1;
+    setPhrases((prev) => prev.map((p) => (p.id === id ? { ...p, learned: nextLearned } : p)));
+    await apiPatch(`/phrases/${id}`, { learned: !!nextLearned }).catch(() => load().catch(() => {}));
   };
 
   const openRegister = (text: string, editable: boolean, folderId: number | null = null) => {
@@ -83,8 +79,12 @@ export function PhraseProvider({ children }: { children: ReactNode }) {
 
   const confirmRegister = async (text: string, folderId: number) => {
     setRegisterState((prev) => ({ ...prev, visible: false }));
-    const res = await apiPost<{ id: number }>('/phrases', { folderId, text, textJP: '' });
-    setPhrases((prev) => [...prev, { id: res.id, folder_id: folderId, text, text_jp: '', learned: 0 }]);
+    try {
+      const res = await apiPost<{ id: number }>('/phrases', { folderId, text, textJP: '' });
+      setPhrases((prev) => [...prev, { id: res.id, folder_id: folderId, text, text_jp: '', learned: 0 }]);
+    } catch {
+      // 登録に失敗した場合は一覧に追加しない（未捕捉のPromise rejectionを避ける）
+    }
   };
 
   const value = useMemo(

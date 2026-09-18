@@ -1,13 +1,17 @@
 import { BACKEND_URL } from '../config/api';
 import { authHeaders } from './mobileAuth';
 
-export type GradingResult = { transcript: string; pass: boolean; comment: string };
+export type GradingResult = { transcript: string; pass: boolean; comment: string; recorded?: boolean };
+
+// ミッション課題の合否をサーバー側で記録するための種別（自由練習などは指定しない）
+export type GradingMission = 'daily:photo' | 'daily:question' | 'weekly' | 'monthly';
 
 export async function submitForGrading(
   uri: string,
   taskLabel: string,
   promptEN: string,
-  promptJP: string
+  promptJP: string,
+  mission?: GradingMission
 ): Promise<GradingResult> {
   const formData = new FormData();
   formData.append('audio', {
@@ -18,6 +22,7 @@ export async function submitForGrading(
   formData.append('taskLabel', taskLabel);
   formData.append('promptEN', promptEN);
   formData.append('promptJP', promptJP);
+  if (mission) formData.append('mission', mission);
 
   // Content-Typeは指定しない: fetchがFormDataから正しいmultipart境界を自動付与する
   const res = await fetch(`${BACKEND_URL}/api/grade`, {

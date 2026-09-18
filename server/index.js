@@ -11,6 +11,7 @@ const { ALL_USERS_MOCK, OTHER_GROUPS_MOCK } = require('./rankingData');
 const adminRoutes = require('./adminRoutes');
 const mobileRoutes = require('./mobileRoutes');
 const { requireAuth } = mobileRoutes;
+const { recordMission } = require('./missions');
 
 const app = express();
 app.use(cors());
@@ -73,7 +74,11 @@ app.post('/api/grade', requireAuth, upload.single('audio'), async (req, res) => 
     });
 
     const parsed = JSON.parse(gradingResp.choices[0].message.content);
-    res.json({ transcript, pass: Boolean(parsed.pass), comment: String(parsed.comment || '') });
+    const pass = Boolean(parsed.pass);
+    // ミッション課題の場合、合否はクライアントの自己申告ではなくここで記録する
+    const mission = String(req.body.mission || '');
+    const recorded = mission ? recordMission(req.studentId, mission, pass) : false;
+    res.json({ transcript, pass, comment: String(parsed.comment || ''), recorded });
   } catch (err) {
     console.error('grade error:', err);
     res.status(500).json({ error: 'grading_failed', });
@@ -182,6 +187,15 @@ app.post('/api/generate/presentation', requireAuth, async (req, res) => {
     console.error('generate presentation error:', err);
     res.status(500).json({ error: 'generate_failed', });
   }
+});
+
+// ルート内の未処理エラー（multerのサイズ超過など）をHTMLではなくJSONで返す
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  if (err && err.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'file_too_large' });
+  if (err && err.type === 'entity.parse.failed') return res.status(400).json({ error: 'invalid_json' });
+  console.error('unhandled error:', err);
+  res.status(500).json({ error: 'internal_error' });
 });
 
 const PORT = process.env.PORT || 4000;

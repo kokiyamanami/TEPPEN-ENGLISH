@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useCallback, useContext, useRef, useState } from 'react';
+import { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
 const ToastContext = createContext<((msg: string) => void) | null>(null);
 
@@ -9,8 +9,19 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const show = useCallback((m: string) => {
     setMsg(m);
     if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => setMsg(null), 2200);
+    timerRef.current = setTimeout(() => setMsg(null), 3000);
   }, []);
+
+  // 各ページのAPI呼び出しはcatchされていないため、失敗しても無反応にならないようここで通知する
+  useEffect(() => {
+    const onRejection = (e: PromiseRejectionEvent) => {
+      e.preventDefault();
+      const reason = e.reason;
+      show(reason instanceof Error && reason.message ? reason.message : '通信に失敗しました');
+    };
+    window.addEventListener('unhandledrejection', onRejection);
+    return () => window.removeEventListener('unhandledrejection', onRejection);
+  }, [show]);
 
   return (
     <ToastContext.Provider value={show}>

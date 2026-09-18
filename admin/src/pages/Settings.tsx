@@ -11,8 +11,13 @@ export default function Settings() {
 
   const save = async (e: FormEvent) => {
     e.preventDefault();
-    await api.patch('/me', { name, notifyEmail });
-    updateUser({ name, notifyEmail });
+    const trimmed = name.trim();
+    if (!trimmed) {
+      toast('氏名を入力してください');
+      return;
+    }
+    await api.patch('/me', { name: trimmed, notifyEmail });
+    updateUser({ name: trimmed, notifyEmail });
     toast('設定を保存しました');
   };
 

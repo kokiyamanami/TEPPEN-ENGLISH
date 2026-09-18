@@ -27,15 +27,24 @@ export function useAudioRecordFlow() {
       Alert.alert('マイクへのアクセスが必要です', '設定アプリからマイクの利用を許可してください。');
       return;
     }
-    await recorder.prepareToRecordAsync();
-    recorder.record();
-    setPhase('recording');
+    try {
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+      setPhase('recording');
+    } catch (e) {
+      Alert.alert('録音を開始できませんでした', 'もう一度お試しください。');
+    }
   };
 
   const stop = async () => {
-    await recorder.stop();
-    setUri(recorder.uri ?? null);
-    setPhase('recorded');
+    try {
+      await recorder.stop();
+      setUri(recorder.uri ?? null);
+      setPhase('recorded');
+    } catch (e) {
+      setPhase('idle');
+      Alert.alert('録音を停止できませんでした', 'もう一度録音してください。');
+    }
   };
 
   const retake = () => {

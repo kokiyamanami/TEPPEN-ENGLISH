@@ -36,6 +36,10 @@ export default function AuthScreen() {
       setError('メールアドレスとパスワードを入力してください');
       return;
     }
+    if (isSignup && password.length < 8) {
+      setError('パスワードは8文字以上にしてください');
+      return;
+    }
     if (isSignup && password !== confirmPassword) {
       setError('パスワードが一致しません');
       return;
@@ -83,7 +87,7 @@ export default function AuthScreen() {
           </Pressable>
         </View>
 
-        <Field label="メールアドレス" placeholder="kenta.sato@example.com" value={email} onChangeText={setEmail} />
+        <Field label="メールアドレス" placeholder="kenta.sato@example.com" value={email} onChangeText={setEmail} keyboardType="email-address" autoComplete="email" />
         <Field label="パスワード" placeholder="••••••••" secure value={password} onChangeText={setPassword} />
         {isSignup && (
           <Field label="パスワード（確認）" placeholder="••••••••" secure value={confirmPassword} onChangeText={setConfirmPassword} />
@@ -150,12 +154,16 @@ function Field({
   secure,
   value,
   onChangeText,
+  keyboardType,
+  autoComplete,
 }: {
   label: string;
   placeholder: string;
   secure?: boolean;
   value: string;
   onChangeText: (t: string) => void;
+  keyboardType?: 'email-address';
+  autoComplete?: 'email';
 }) {
   return (
     <View style={styles.fieldBlock}>
@@ -166,6 +174,9 @@ function Field({
         placeholderTextColor={colors.textSecondary}
         secureTextEntry={secure}
         autoCapitalize="none"
+        autoCorrect={false}
+        keyboardType={keyboardType}
+        autoComplete={autoComplete ?? (secure ? 'password' : undefined)}
         value={value}
         onChangeText={onChangeText}
       />

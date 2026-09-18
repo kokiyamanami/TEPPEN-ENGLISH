@@ -86,15 +86,16 @@ export function TalkProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    let kind: TalkThread['kind'] | undefined;
-    let history: TalkMessage[] = [];
+    // 更新関数の中で外側の変数を書き換えて後で読む実装は、更新関数が遅延実行されると空のままになるため、
+    // 現在のstateから直接履歴を組み立てる
+    const current = threads[key];
+    if (!current) return;
+    const kind = current.kind;
+    const history: TalkMessage[] = [...current.messages, { from: 'me', text, time: now }];
     setThreads((prev) => {
       const thread = prev[key];
       if (!thread) return prev;
-      kind = thread.kind;
-      const updated: TalkThread = { ...thread, messages: [...thread.messages, { from: 'me', text, time: now }] };
-      history = updated.messages;
-      return { ...prev, [key]: updated };
+      return { ...prev, [key]: { ...thread, messages: [...thread.messages, { from: 'me', text, time: now }] } };
     });
 
     if (kind === 'ai') {

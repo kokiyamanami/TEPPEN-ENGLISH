@@ -5,6 +5,7 @@ const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
 const db = require('./db');
+const { todayStr } = require('./dateUtil');
 
 const router = express.Router();
 if (!process.env.ADMIN_JWT_SECRET && process.env.NODE_ENV === 'production') {
@@ -47,8 +48,9 @@ router.get('/me', requireAuth, (req, res) => {
 
 router.patch('/me', requireAuth, (req, res) => {
   const { name, notifyEmail } = req.body || {};
+  if (name !== undefined && (typeof name !== 'string' || !name.trim())) return res.status(400).json({ error: 'name must not be empty' });
   db.prepare('UPDATE admin_users SET name = COALESCE(?, name), notify_email = COALESCE(?, notify_email) WHERE id = ?').run(
-    name ?? null,
+    name === undefined ? null : name.trim(),
     notifyEmail === undefined ? null : notifyEmail ? 1 : 0,
     req.admin.id
   );
@@ -63,7 +65,7 @@ router.get('/overview', (req, res) => {
   const activeStudents = db.prepare("SELECT COUNT(*) c FROM students WHERE status = 'active'").get().c;
   const avgSpeak =
     db.prepare(`SELECT AVG(speak_min) a FROM speaking_stats WHERE date >= date('now', '-30 day')`).get().a || 0;
-  const recentMonth = new Date().toISOString().slice(0, 7);
+  const recentMonth = todayStr().slice(0, 7);
   const monthlyPassRate = db
     .prepare(`SELECT AVG(pass) a FROM monthly_mission_results WHERE month = ?`)
     .get(recentMonth);
@@ -135,7 +137,7 @@ router.post('/students', (req, res) => {
   try {
     const info = db
       .prepare('INSERT INTO students (name, email, phone, group_id, phase, status, last_login) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      .run(name, email.trim() || null, phone, groupId, phase, 'active', new Date().toISOString().slice(0, 10));
+      .run(name, email.trim() || null, phone, groupId, phase, 'active', todayStr());
     res.json({ id: info.lastInsertRowid });
   } catch (err) {
     if (String(err.message).includes('UNIQUE')) {
@@ -175,7 +177,7 @@ router.post('/students/bulk', (req, res) => {
     if (!name) return { row: i + 1, ok: false, error: '氏名が空です' };
     const email = (row.email || '').trim() || null;
     try {
-      const info = insert.run(name, email, row.phone || '', row.groupId || null, 'active', new Date().toISOString().slice(0, 10));
+      const info = insert.run(name, email, row.phone || '', row.groupId || null, 'active', todayStr());
       return { row: i + 1, ok: true, id: info.lastInsertRowid };
     } catch (err) {
       const msg = String(err.message).includes('UNIQUE') ? 'メールアドレスが重複しています' : String(err.message);
@@ -188,7 +190,9 @@ router.post('/students/bulk', (req, res) => {
 // 複数生徒のステータス一括変更
 router.post('/students/bulk-status', (req, res) => {
   const { ids, status } = req.body || {};
-  if (!Array.isArray(ids) || ids.length === 0 || !status) return res.status(400).json({ error: 'ids and status are required' });
+  if (!Array.isArray(ids) || ids.length === 0 || !['active', 'inactive'].includes(status)) {
+    return res.status(400).json({ error: 'ids and a valid status (active/inactive) are required' });
+  }
   const update = db.prepare('UPDATE students SET status = ? WHERE id = ?');
   const tx = db.transaction((studentIds) => {
     studentIds.forEach((id) => update.run(status, id));
@@ -226,17 +230,19 @@ router.get('/students/:id', (req, res) => {
 
 router.post('/students/:id/phase', (req, res) => {
   const { phase, date, listening = 0, accuracy = 0, fluency = 0, clarity = 0 } = req.body || {};
-  if (!phase) return res.status(400).json({ error: 'phase is required' });
+  const isRating = (v) => Number.isInteger(v) && v >= 1 && v <= 5;
+  if (!isRating(phase)) return res.status(400).json({ error: 'phase must be 1-5' });
+  if (![listening, accuracy, fluency, clarity].every(isRating)) return res.status(400).json({ error: 'ratings must be 1-5' });
   db.prepare(
     'INSERT INTO phase_history (student_id, phase, date, listening, accuracy, fluency, clarity) VALUES (?, ?, ?, ?, ?, ?, ?)'
-  ).run(req.params.id, phase, date || new Date().toISOString().slice(0, 10), listening, accuracy, fluency, clarity);
+  ).run(req.params.id, phase, date || todayStr(), listening, accuracy, fluency, clarity);
   db.prepare('UPDATE students SET phase = ? WHERE id = ?').run(phase, req.params.id);
   res.json({ ok: true });
 });
 
 router.post('/students/:id/monthly', (req, res) => {
   const { month, pass, date } = req.body || {};
-  const safeDate = date || new Date().toISOString().slice(0, 10);
+  const safeDate = date || todayStr();
   const existing = db.prepare('SELECT id FROM monthly_mission_results WHERE student_id = ? AND month = ?').get(req.params.id, month);
   if (existing) {
     db.prepare('UPDATE monthly_mission_results SET pass = ?, date = ? WHERE id = ?').run(pass ? 1 : 0, safeDate, existing.id);
@@ -411,10 +417,11 @@ router.get('/announcements', (req, res) => {
 router.post('/announcements', (req, res) => {
   const { title, body, target = '全生徒', targetGroupId = null, status = 'draft' } = req.body || {};
   if (!title) return res.status(400).json({ error: 'title is required' });
+  if (!['全生徒', '特定グループ'].includes(target)) return res.status(400).json({ error: 'invalid target' });
   if (target === '特定グループ' && !targetGroupId) return res.status(400).json({ error: 'targetGroupId is required' });
   const info = db
     .prepare('INSERT INTO announcements (title, body, target, target_group_id, status, created_at) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(title, body, target, target === '特定グループ' ? targetGroupId : null, status, new Date().toISOString().slice(0, 10));
+    .run(title, body, target, target === '特定グループ' ? targetGroupId : null, status, todayStr());
   res.json({ id: info.lastInsertRowid });
 });
 
@@ -456,6 +463,9 @@ function extractYoutubeId(input) {
   return trimmed;
 }
 
+// YouTube動画IDの形式（アプリ側のプレイヤーにそのまま渡されるため、想定外の文字列は保存しない）
+const YOUTUBE_ID_PATTERN = /^[A-Za-z0-9_-]{6,20}$/;
+
 router.get('/lectures', (req, res) => {
   res.json(db.prepare('SELECT * FROM lectures ORDER BY sort_order, id').all());
 });
@@ -463,14 +473,18 @@ router.get('/lectures', (req, res) => {
 router.post('/lectures', (req, res) => {
   const { youtubeId, title, instructor = '', category = '', sortOrder = 0 } = req.body || {};
   if (!youtubeId || !title) return res.status(400).json({ error: 'youtubeId and title are required' });
+  if (!YOUTUBE_ID_PATTERN.test(extractYoutubeId(youtubeId))) return res.status(400).json({ error: 'YouTubeの動画URLまたはIDを正しく入力してください' });
   const info = db
     .prepare('INSERT INTO lectures (youtube_id, title, instructor, category, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(extractYoutubeId(youtubeId), title, instructor, category, sortOrder, new Date().toISOString().slice(0, 10));
+    .run(extractYoutubeId(youtubeId), title, instructor, category, sortOrder, todayStr());
   res.json({ id: info.lastInsertRowid });
 });
 
 router.patch('/lectures/:id', (req, res) => {
   const { youtubeId, title, instructor, category, sortOrder } = req.body || {};
+  if (youtubeId && !YOUTUBE_ID_PATTERN.test(extractYoutubeId(youtubeId))) {
+    return res.status(400).json({ error: 'YouTubeの動画URLまたはIDを正しく入力してください' });
+  }
   db.prepare(
     `UPDATE lectures SET
       youtube_id = COALESCE(?, youtube_id), title = COALESCE(?, title), instructor = COALESCE(?, instructor),
@@ -527,7 +541,7 @@ router.post('/ads', (req, res) => {
   if (linkUrl && !/^https?:\/\//i.test(linkUrl)) return res.status(400).json({ error: 'linkUrl must be http(s)' });
   const info = db
     .prepare('INSERT INTO ad_banners (image_url, link_url, placement, enabled, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(imageUrl, linkUrl, placement, enabled ? 1 : 0, sortOrder, new Date().toISOString().slice(0, 10));
+    .run(imageUrl, linkUrl, placement, enabled ? 1 : 0, sortOrder, todayStr());
   res.json({ id: info.lastInsertRowid });
 });
 

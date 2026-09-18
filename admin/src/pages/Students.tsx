@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
+import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { Avatar } from '../components/Avatar';
@@ -25,7 +25,9 @@ type BulkResult = { row: number; ok: boolean; id?: number; error?: string };
 
 // CSVの1行を name,email,phone のカンマ区切りとしてパースする（簡易パーサー、引用符内カンマ等は非対応）
 function parseCsv(text: string): BulkRow[] {
+  // ExcelがUTF-8で保存したCSVは先頭にBOMが付くため除去する
   return text
+    .replace(/^\uFEFF/, '')
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean)
@@ -55,12 +57,17 @@ export default function Students() {
   const [bulkGroupId, setBulkGroupId] = useState('');
   const [bulkResults, setBulkResults] = useState<BulkResult[] | null>(null);
 
+  // 検索を素早く打ち替えた時に、遅れて返ってきた古い結果で一覧が上書きされないようにする
+  const requestSeq = useRef(0);
   const load = () => {
     const params = new URLSearchParams();
     if (search) params.set('search', search);
     if (groupFilter) params.set('groupId', groupFilter);
     if (statusFilter) params.set('status', statusFilter);
-    api.get<Student[]>(`/students?${params.toString()}`).then(setStudents);
+    const seq = ++requestSeq.current;
+    api.get<Student[]>(`/students?${params.toString()}`).then((rows) => {
+      if (seq === requestSeq.current) setStudents(rows);
+    });
   };
 
   useEffect(() => {

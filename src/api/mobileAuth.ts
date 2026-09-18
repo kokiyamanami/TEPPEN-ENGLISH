@@ -53,6 +53,8 @@ export async function authedFetch(path: string, options: RequestInit = {}) {
       ...options.headers,
     },
   });
+  // トークンの期限切れ・失効時は破棄して、次回起動時にログイン画面へ戻れるようにする
+  if (res.status === 401 && token) await clearToken();
   return res;
 }
 

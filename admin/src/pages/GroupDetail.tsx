@@ -4,6 +4,7 @@ import { api } from '../api/client';
 import { Avatar } from '../components/Avatar';
 import { Modal } from '../components/Modal';
 import { useToast } from '../context/ToastContext';
+import { mondayStr } from '../utils/date';
 
 type GroupDetailData = {
   group: { id: number; name: string; status: string };
@@ -31,8 +32,16 @@ export default function GroupDetail() {
   const [searchResults, setSearchResults] = useState<StudentSearchResult[]>([]);
   const [removeTarget, setRemoveTarget] = useState<{ id: number; name: string } | null>(null);
 
+  const [notFound, setNotFound] = useState(false);
+
   const load = () => {
-    api.get<GroupDetailData>(`/groups/${id}`).then(setData);
+    api
+      .get<GroupDetailData>(`/groups/${id}`)
+      .then((d) => {
+        setNotFound(false);
+        setData(d);
+      })
+      .catch(() => setNotFound(true));
   };
 
   useEffect(() => {
@@ -43,19 +52,29 @@ export default function GroupDetail() {
     if (!showAddMember) return;
     const params = new URLSearchParams();
     if (memberSearch) params.set('search', memberSearch);
-    api.get<StudentSearchResult[]>(`/students?${params.toString()}`).then(setSearchResults);
+    let cancelled = false;
+    api.get<StudentSearchResult[]>(`/students?${params.toString()}`).then((rows) => {
+      if (!cancelled) setSearchResults(rows);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [showAddMember, memberSearch]);
 
+  if (notFound && !data) {
+    return (
+      <div className="loading-wrap">
+        グループが見つかりません。<Link to="/groups">グループ管理に戻る</Link>
+      </div>
+    );
+  }
   if (!data) return <div className="loading-wrap">読み込み中…</div>;
 
   const buckets = [...data.dailyStats].reverse().slice(-14);
   const maxVal = Math.max(...buckets.map((b) => b.study_min), 1);
 
   const confirmGoal = async () => {
-    const monday = new Date();
-    const day = monday.getDay();
-    monday.setDate(monday.getDate() - (day === 0 ? 6 : day - 1));
-    await api.post(`/groups/${id}/goals`, { weekStart: monday.toISOString().slice(0, 10), ...goalForm });
+    await api.post(`/groups/${id}/goals`, { weekStart: mondayStr(), ...goalForm });
     toast('目標を設定しました');
     setShowGoalConfirm(false);
     setShowGoalForm(false);

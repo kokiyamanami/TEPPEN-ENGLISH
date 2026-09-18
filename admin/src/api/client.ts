@@ -1,4 +1,5 @@
-export const BACKEND_URL = 'http://35.72.165.240:4000';
+// EC2開発サーバーのURL。本番ではビルド時に VITE_BACKEND_URL で上書きする
+export const BACKEND_URL: string = import.meta.env.VITE_BACKEND_URL || 'http://35.72.165.240:4000';
 
 function getToken() {
   return localStorage.getItem('admin_token');

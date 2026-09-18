@@ -1,7 +1,6 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { apiPost } from '../src/api/mobileAuth';
 import { submitForGrading } from '../src/api/grading';
 import { RecordCard } from '../src/components/RecordCard';
 import { ResultView } from '../src/components/ResultView';
@@ -25,10 +24,10 @@ export default function MissionScreen() {
         record.uri,
         'Monthlyミッション: MYピッチ',
         memo.trim() || '(自由スピーチ。特定の原稿指定なし。内容の一貫性・具体性・発話量を評価してください)',
-        ''
+        '',
+        'monthly'
       );
       setResult(res);
-      await apiPost('/monthly-mission', { pass: res.pass }).catch(() => {});
     } catch (e) {
       Alert.alert('添削に失敗しました', 'サーバーに接続できませんでした。もう一度お試しください。');
     } finally {
@@ -70,7 +69,7 @@ export default function MissionScreen() {
       <TopBar title="Monthlyミッション" backRoute="/speaking_hub" />
 
       <View style={styles.statusCard}>
-        <Text style={styles.statusTag}>MYピッチ · 8月分</Text>
+        <Text style={styles.statusTag}>MYピッチ · {new Date().getMonth() + 1}月分</Text>
         <Text style={styles.statusBig}>{record.phase === 'idle' ? '未録音' : record.phase === 'recorded' ? '録音済み' : '録音中'}</Text>
         <Text style={styles.statusSub}>月1回だけ挑戦できるスピーチ課題です</Text>
       </View>

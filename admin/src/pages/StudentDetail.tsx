@@ -4,6 +4,7 @@ import { api } from '../api/client';
 import { Avatar } from '../components/Avatar';
 import { Modal } from '../components/Modal';
 import { useToast } from '../context/ToastContext';
+import { monthStr, todayStr } from '../utils/date';
 
 type StudentDetailData = {
   student: {
@@ -33,26 +34,38 @@ export default function StudentDetail() {
   const [phaseForm, setPhaseForm] = useState({ phase: 1, listening: 3, accuracy: 3, fluency: 3, clarity: 3 });
   const [showMonthlyForm, setShowMonthlyForm] = useState(false);
   const [showMonthlyConfirm, setShowMonthlyConfirm] = useState(false);
-  const [monthlyForm, setMonthlyForm] = useState({ month: new Date().toISOString().slice(0, 7), pass: true });
+  const [monthlyForm, setMonthlyForm] = useState({ month: monthStr(), pass: true });
   const [showStars, setShowStars] = useState<StudentDetailData['phaseHistory'][number] | null>(null);
   const [chatInput, setChatInput] = useState('');
+  const [notFound, setNotFound] = useState(false);
 
   const load = () => {
-    api.get<StudentDetailData>(`/students/${id}`).then((d) => {
-      setData(d);
-      setPhaseForm((prev) => ({ ...prev, phase: d.student.phase }));
-    });
+    api
+      .get<StudentDetailData>(`/students/${id}`)
+      .then((d) => {
+        setNotFound(false);
+        setData(d);
+        setPhaseForm((prev) => ({ ...prev, phase: d.student.phase }));
+      })
+      .catch(() => setNotFound(true));
   };
 
   useEffect(() => {
     load();
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  if (notFound && !data) {
+    return (
+      <div className="loading-wrap">
+        生徒が見つかりません。<Link to="/students">生徒一覧に戻る</Link>
+      </div>
+    );
+  }
   if (!data) return <div className="loading-wrap">読み込み中…</div>;
   const { student } = data;
 
   const confirmPhase = async () => {
-    await api.post(`/students/${id}/phase`, { ...phaseForm, date: new Date().toISOString().slice(0, 10) });
+    await api.post(`/students/${id}/phase`, { ...phaseForm, date: todayStr() });
     toast('Phaseを更新しました');
     setShowPhaseConfirm(false);
     setShowPhaseForm(false);
@@ -60,7 +73,7 @@ export default function StudentDetail() {
   };
 
   const confirmMonthly = async () => {
-    await api.post(`/students/${id}/monthly`, { ...monthlyForm, date: new Date().toISOString().slice(0, 10) });
+    await api.post(`/students/${id}/monthly`, { ...monthlyForm, date: todayStr() });
     toast('Monthlyミッション結果を保存しました');
     setShowMonthlyConfirm(false);
     setShowMonthlyForm(false);
