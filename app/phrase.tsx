@@ -17,7 +17,7 @@ const SECTIONS: { source: PhraseFolderSource; title: string; desc: string; empty
 // screen key: phrase
 export default function PhraseScreen() {
   const topInset = useTopInset();
-  const { folders, reload, folderCount, addFolder, deleteFolder, renameFolder, openRegister } = usePhrases();
+  const { folders, reload, folderCount, addFolder, deleteFolder, renameFolder } = usePhrases();
   // カスタマイズ教材はプロフィールからAIが作るため、できるまで数秒〜1分ほどかかる。できるまで定期的に取得し直す
   const hasCurated = folders.some((f) => f.source === 'curated');
   useEffect(() => {
@@ -72,9 +72,6 @@ export default function PhraseScreen() {
 
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>MYフレーズ</Text>
-        <Pressable onPress={() => openRegister('', true, null, '', tab)}>
-          <Text style={styles.addLink}>{tab === 'word' ? '＋ 単語を追加' : '＋ フレーズを追加'}</Text>
-        </Pressable>
       </View>
 
       <Pressable style={styles.historyLink} onPress={() => router.push('/phrase_history' as never)}>
