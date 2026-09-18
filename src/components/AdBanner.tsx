@@ -17,6 +17,7 @@ function resolveImageUri(url: string) {
 export function AdBanner({ placement = 'home' }: { placement?: 'home' | 'talk' | 'mypage' }) {
   const [ads, setAds] = useState<AdBannerData[]>([]);
   const [index, setIndex] = useState(0);
+  const [ratios, setRatios] = useState<Record<number, number>>({});
 
   const load = useCallback(() => {
     apiGet<AdBannerData[]>(`/ad-banners?placement=${placement}`)
@@ -33,8 +34,19 @@ export function AdBanner({ placement = 'home' }: { placement?: 'home' | 'talk' |
     return () => clearInterval(timer);
   }, [ads.length]);
 
-  if (ads.length === 0) return null;
-  const ad = ads[index % ads.length];
+  const ad = ads.length ? ads[index % ads.length] : null;
+
+  // 画像の縦横比のまま表示する（固定比率でcoverすると、縦長のバナーは上下が切れてしまう）
+  useEffect(() => {
+    if (!ad || ratios[ad.id]) return;
+    Image.getSize(
+      resolveImageUri(ad.imageUrl),
+      (w, h) => h > 0 && setRatios((r) => ({ ...r, [ad.id]: Math.min(4, Math.max(1, w / h)) })),
+      () => {}
+    );
+  }, [ad, ratios]);
+
+  if (!ad) return null;
 
   return (
     <Pressable
@@ -43,7 +55,7 @@ export function AdBanner({ placement = 'home' }: { placement?: 'home' | 'talk' |
         if (/^https?:\/\//i.test(ad.linkUrl)) Linking.openURL(ad.linkUrl).catch(() => {});
       }}
     >
-      <Image source={{ uri: resolveImageUri(ad.imageUrl) }} style={styles.image} resizeMode="cover" />
+      <Image source={{ uri: resolveImageUri(ad.imageUrl) }} style={[styles.image, { aspectRatio: ratios[ad.id] ?? 335 / 90 }]} resizeMode="cover" />
     </Pressable>
   );
 }
@@ -55,5 +67,5 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     overflow: 'hidden',
   },
-  image: { width: '100%', aspectRatio: 335 / 90 },
+  image: { width: '100%' },
 });

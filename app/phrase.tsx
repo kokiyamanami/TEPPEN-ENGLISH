@@ -2,10 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TopBar } from '../src/components/TopBar';
 import { PhraseFolderSource, usePhrases } from '../src/store/PhraseContext';
 import { colors, radius, spacing } from '../src/theme/colors';
+import { useTopInset } from '../src/hooks/useTopInset';
 
 const SECTIONS: { source: PhraseFolderSource; title: string; desc: string; empty: string }[] = [
   { source: 'curated', title: 'カスタマイズ教材', desc: 'あなたの職業・趣味・性格・経歴に合わせて、運営が選んだ単語です', empty: 'プロフィールに合わせた教材が用意され次第、ここに表示されます' },
@@ -15,7 +15,7 @@ const SECTIONS: { source: PhraseFolderSource; title: string; desc: string; empty
 
 // screen key: phrase
 export default function PhraseScreen() {
-  const insets = useSafeAreaInsets();
+  const topInset = useTopInset();
   const { folders, folderCount, addFolder, deleteFolder, renameFolder, openRegister } = usePhrases();
   const [renameTarget, setRenameTarget] = useState<{ id: number; name: string } | null>(null);
   const [showAddFolder, setShowAddFolder] = useState(false);
@@ -99,7 +99,7 @@ export default function PhraseScreen() {
 
       <Modal visible={showAddFolder} transparent animationType="slide" onRequestClose={() => setShowAddFolder(false)}>
         <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={[styles.sheet, { paddingTop: insets.top + spacing.lg }]}>
+          <View style={[styles.sheet, { paddingTop: topInset + spacing.lg }]}>
             <Text style={styles.sheetTitle}>{renameTarget ? 'フォルダ名を変更' : '新しいフォルダを追加'}</Text>
             <Text style={styles.sheetDesc}>フレーズを整理するための、あなた専用のフォルダです</Text>
             <TextInput
@@ -123,7 +123,7 @@ export default function PhraseScreen() {
 
       <Modal visible={!!deleteTarget} transparent animationType="fade" onRequestClose={() => setDeleteTarget(null)}>
         <View style={styles.overlay}>
-          <View style={[styles.sheet, { paddingTop: insets.top + spacing.lg }]}>
+          <View style={[styles.sheet, { paddingTop: topInset + spacing.lg }]}>
             <Text style={styles.sheetTitle}>このフォルダを削除しますか？</Text>
             <Text style={styles.sheetDesc}>中のフレーズもまとめて削除されます。この操作は元に戻せません。</Text>
             <View style={styles.sheetRow}>

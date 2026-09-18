@@ -1,12 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePhrases } from '../store/PhraseContext';
 import { colors, radius, spacing } from '../theme/colors';
+import { useTopInset } from '../hooks/useTopInset';
 
 export function PhraseRegisterModal() {
-  const insets = useSafeAreaInsets();
+  const topInset = useTopInset();
   const { registerState, closeRegister, confirmRegister, folders, addFolder, deletePhrase } = usePhrases();
   const myFolders = folders.filter((f) => f.source === 'custom');
   const [text, setText] = useState('');
@@ -36,7 +36,7 @@ export function PhraseRegisterModal() {
   return (
     <Modal visible={registerState.visible} transparent animationType="slide" onRequestClose={closeRegister}>
       <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={[styles.sheet, { paddingTop: insets.top + spacing.lg }]}>
+        <View style={[styles.sheet, { paddingTop: topInset + spacing.lg }]}>
           <Text style={styles.title}>{registerState.editId !== null ? 'フレーズを編集' : 'MYフレーズに登録'}</Text>
 
           {registerState.editable ? (

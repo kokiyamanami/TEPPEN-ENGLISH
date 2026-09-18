@@ -1,16 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TopBar } from '../src/components/TopBar';
 import { CURRENT_TERM_LABEL } from '../src/data/goals';
 import { useGoals } from '../src/store/GoalsContext';
 import { useProfile } from '../src/store/ProfileContext';
 import { colors, radius, spacing } from '../src/theme/colors';
+import { useTopInset } from '../src/hooks/useTopInset';
 
 // screen key: goal_history
 export default function GoalHistoryScreen() {
-  const insets = useSafeAreaInsets();
+  const topInset = useTopInset();
   const { studyGoal, speakGoal, setDailyGoals, termGoalHistory, addTermGoal } = useGoals();
   const { setField } = useProfile();
   const [studyInput, setStudyInput] = useState(String(studyGoal));
@@ -24,7 +24,8 @@ export default function GoalHistoryScreen() {
   const [newGoalText, setNewGoalText] = useState('');
 
   const saveDailyGoals = () => {
-    setDailyGoals(Number(studyInput) || studyGoal, Number(speakInput) || speakGoal);
+    // サーバーは整数(1〜1440)のみ受け付けるため、小数入力は四捨五入する
+    setDailyGoals(Math.round(Number(studyInput)) || studyGoal, Math.round(Number(speakInput)) || speakGoal);
   };
 
   const saveNewGoal = () => {
@@ -70,7 +71,7 @@ export default function GoalHistoryScreen() {
 
       <Modal visible={showNewGoal} transparent animationType="slide" onRequestClose={() => setShowNewGoal(false)}>
         <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={[styles.sheet, { paddingTop: insets.top + spacing.lg }]}>
+          <View style={[styles.sheet, { paddingTop: topInset + spacing.lg }]}>
             <Text style={styles.sheetTitle}>新しい目標を設定</Text>
             <Text style={styles.sheetDesc}>現在のターム（{CURRENT_TERM_LABEL}）の目標として登録されます</Text>
             <TextInput

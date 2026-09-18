@@ -9,6 +9,7 @@ import { ASCENT_MILESTONES, Milestone } from '../src/data/mockHome';
 import { useProfile } from '../src/store/ProfileContext';
 import { useStats } from '../src/store/StatsContext';
 import { colors, radius, spacing } from '../src/theme/colors';
+import { useTopInset } from '../src/hooks/useTopInset';
 
 const NODE_H = 76;
 const LEG_H = 72;
@@ -50,6 +51,7 @@ function HeroBackdrop({ height }: { height: number }) {
 // screen key: ascent_climb
 export default function AscentClimbScreen() {
   const insets = useSafeAreaInsets();
+  const topInset = useTopInset();
   const { totalStudyMinutes, todayStudyMinutes, reload } = useStats();
   const { profile, avatarUrl } = useProfile();
   const scroller = useRef<ScrollView>(null);
@@ -74,7 +76,7 @@ export default function AscentClimbScreen() {
     scroller.current?.scrollTo({ y: Math.max(0, y), animated: false });
   }, [listTop, currentLeg]);
 
-  const heroH = 300 + insets.top;
+  const heroH = 300 + topInset;
   const avatarUri = avatarUrl ? (avatarUrl.startsWith('http') ? avatarUrl : `${BACKEND_URL}${avatarUrl}`) : null;
 
   return (
@@ -82,7 +84,7 @@ export default function AscentClimbScreen() {
       <ScrollView ref={scroller} contentContainerStyle={{ paddingBottom: spacing.xl + insets.bottom }}>
         <View style={{ height: heroH }}>
           <HeroBackdrop height={heroH} />
-          <View style={[styles.heroInner, { paddingTop: insets.top + spacing.sm }]}>
+          <View style={[styles.heroInner, { paddingTop: topInset + spacing.sm }]}>
             <Pressable style={styles.backBtn} onPress={() => router.back()} hitSlop={10}>
               <Ionicons name="chevron-back" size={20} color="#fff" />
             </Pressable>

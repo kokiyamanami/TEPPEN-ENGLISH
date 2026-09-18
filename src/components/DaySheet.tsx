@@ -1,10 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { STUDY_CATEGORIES, STUDY_SUBCATEGORIES, StudyLogEntry } from '../data/records';
 import { colors, radius, spacing } from '../theme/colors';
 import { addDays } from '../utils/dateHelpers';
+import { useTopInset } from '../hooks/useTopInset';
 
 const WEEKDAY_JP = ['日', '月', '火', '水', '木', '金', '土'];
 
@@ -27,7 +27,7 @@ const EMPTY_FORM = { category: STUDY_CATEGORIES[0].key, subs: [] as string[], mi
 
 // 1日に複数件の学習記録を登録・編集・削除できるシート。日付は矢印で前後に移動できる
 export function DaySheet({ visible, date, entries, onChangeDate, onCancel, onSave, onDelete }: Props) {
-  const insets = useSafeAreaInsets();
+  const topInset = useTopInset();
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
@@ -88,7 +88,7 @@ export function DaySheet({ visible, date, entries, onChangeDate, onCancel, onSav
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onCancel}>
       <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={[styles.sheet, { paddingTop: insets.top + spacing.lg }]}>
+        <View style={[styles.sheet, { paddingTop: topInset + spacing.lg }]}>
           <ScrollView showsVerticalScrollIndicator={false}>
             <Text style={styles.title}>学習記録</Text>
             <View style={styles.dateNav}>

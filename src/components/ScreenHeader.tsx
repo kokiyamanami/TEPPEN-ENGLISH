@@ -1,11 +1,11 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing } from '../theme/colors';
+import { useTopInset } from '../hooks/useTopInset';
 
 export function ScreenHeader({ title, subtitle }: { title: string; subtitle?: string }) {
-  const insets = useSafeAreaInsets();
+  const topInset = useTopInset();
   return (
-    <View style={[styles.container, { paddingTop: insets.top + spacing.sm }]}>
+    <View style={[styles.container, { paddingTop: topInset + spacing.sm }]}>
       <Text style={styles.title}>{title}</Text>
       {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
     </View>
