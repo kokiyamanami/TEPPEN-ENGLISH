@@ -4,8 +4,9 @@ const db = require('./db');
 function matchesProfile(deck, profile) {
   const v = String(deck.attr_value || '').trim();
   if (!v || !deck.attr) return false;
-  if (deck.attr === 'job') return (Array.isArray(profile.job) ? profile.job : []).includes(v) || String(profile.jobDetail || '').includes(v);
-  if (deck.attr === 'hobby') return (Array.isArray(profile.hobby) ? profile.hobby : []).includes(v);
+  const list = (x) => (Array.isArray(x) ? x : x ? [String(x)] : []);
+  if (deck.attr === 'job') return list(profile.job).includes(v) || String(profile.jobDetail || '').includes(v);
+  if (deck.attr === 'hobby') return list(profile.hobby).includes(v);
   if (deck.attr === 'personality') return String(profile.personality || '').includes(v);
   if (deck.attr === 'career') return String(profile.career || '').includes(v);
   return false;

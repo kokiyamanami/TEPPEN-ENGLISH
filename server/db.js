@@ -299,8 +299,6 @@ function seedIfEmpty() {
   const insertPhaseHist = db.prepare(
     'INSERT INTO phase_history (student_id, phase, date, listening, accuracy, fluency, clarity) VALUES (?, ?, ?, ?, ?, ?, ?)'
   );
-  const insertFolder = db.prepare('INSERT INTO phrase_folders (student_id, name, source) VALUES (?, ?, ?)');
-  const insertPhrase = db.prepare('INSERT INTO phrases (student_id, folder_id, text, text_jp) VALUES (?, ?, ?, ?)');
   const insertChat = db.prepare('INSERT INTO chat_messages (student_id, sender, text, time) VALUES (?, ?, ?, ?)');
   const insertUnit = db.prepare('INSERT INTO unit_submissions (student_id, unit, submitted_at, status) VALUES (?, ?, ?, ?)');
 
@@ -333,13 +331,6 @@ function seedIfEmpty() {
       2 + Math.floor(Math.random() * 3),
       2 + Math.floor(Math.random() * 3)
     );
-
-    const f1 = insertFolder.run(studentId, '重要構文40', 'official').lastInsertRowid;
-    const f2 = insertFolder.run(studentId, 'お役立ちフレーズ50', 'official').lastInsertRowid;
-    if (i % 3 === 0) {
-      insertPhrase.run(studentId, f1, 'Let me walk you through the numbers.', '数字についてご説明させてください。');
-      insertPhrase.run(studentId, f2, 'Could you elaborate on that?', 'もう少し詳しく教えていただけますか？');
-    }
 
     insertChat.run(studentId, 'coach', 'MYピッチの提出お待ちしています。準備で困っていることがあればどうぞ。', addDaysStr(-1));
     if (i % 2 === 0) {
