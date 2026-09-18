@@ -86,7 +86,7 @@ export default function PhraseFolderScreen() {
         </Pressable>
       </View>
 
-      <ScrollView ref={pager} horizontal pagingEnabled showsHorizontalScrollIndicator={false} onMomentumScrollEnd={onSwipeEnd}>
+      <ScrollView ref={pager} style={{ flexGrow: 0 }} horizontal pagingEnabled showsHorizontalScrollIndicator={false} onMomentumScrollEnd={onSwipeEnd}>
         {folderPhrases.map((p, i) => (
           <View key={p.id} style={{ width }}>
             <View style={styles.flashCard}>
