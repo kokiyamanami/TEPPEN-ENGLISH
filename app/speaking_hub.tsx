@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { HubRow } from '../src/components/HubRow';
-import { SpeechTimeWidget } from '../src/components/SpeechTimeWidget';
+import { TodayTimeWidget } from '../src/components/TodayTimeWidget';
 import { TopBar } from '../src/components/TopBar';
 import { colors, spacing } from '../src/theme/colors';
 
@@ -11,7 +11,7 @@ export default function SpeakingHubScreen() {
     <ScrollView style={styles.screen}>
       <TopBar title="ミッション" backRoute="/(tabs)/home" />
       <View style={styles.widgetWrap}>
-        <SpeechTimeWidget doneMin={16} goalMin={30} />
+        <TodayTimeWidget />
       </View>
 
       <Text style={styles.sectionTitle}>メニュー</Text>

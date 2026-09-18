@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const OpenAI = require('openai');
 const db = require('./db');
+const { todayStr, mondayOfStr } = require('./dateUtil');
 const { lookupDictionary } = require('./dictionary');
 
 const router = express.Router();
@@ -34,25 +35,17 @@ function requireAuth(req, res, next) {
   }
 }
 
-// 日本時間(JST)基準の日付。toISOString()はUTCのため、JSTの0〜9時に前日扱いになってしまう
-function jstDate(d = new Date()) {
-  return new Date(d.getTime() + 9 * 60 * 60 * 1000);
-}
-
-function todayStr() {
-  return jstDate().toISOString().slice(0, 10);
-}
-
 // ---- auth ----
 router.post('/signup', (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'email and password are required' });
   if (typeof email !== 'string' || typeof password !== 'string') return res.status(400).json({ error: 'invalid input' });
+  const normalizedEmail = email.trim().toLowerCase();
   if (password.length < 8) return res.status(400).json({ error: 'パスワードは8文字以上にしてください' });
 
   // 管理画面でメールアドレス付きの生徒レコードが先に作られている場合があるため、
   // password_hash未設定（＝まだ本人がサインアップしていない）ならそのレコードを引き継ぐ
-  const existing = db.prepare('SELECT id, password_hash FROM students WHERE email = ?').get(email);
+  const existing = db.prepare('SELECT id, password_hash FROM students WHERE lower(email) = ?').get(normalizedEmail);
   if (existing && existing.password_hash) return res.status(409).json({ error: 'このメールアドレスは既に登録されています' });
 
   const hash = bcrypt.hashSync(password, 10);
@@ -63,7 +56,7 @@ router.post('/signup', (req, res) => {
   } else {
     const info = db
       .prepare('INSERT INTO students (name, email, password_hash, phase, status, last_login, profile_json) VALUES (?, ?, ?, 1, ?, ?, ?)')
-      .run('', email, hash, 'active', todayStr(), '{}');
+      .run('', normalizedEmail, hash, 'active', todayStr(), '{}');
     studentId = info.lastInsertRowid;
   }
 
@@ -81,7 +74,7 @@ router.post('/signup', (req, res) => {
 router.post('/login', (req, res) => {
   const { email, password } = req.body || {};
   if (typeof email !== 'string') return res.status(401).json({ error: 'メールアドレスまたはパスワードが正しくありません' });
-  const student = db.prepare('SELECT * FROM students WHERE email = ?').get(email);
+  const student = db.prepare('SELECT * FROM students WHERE lower(email) = ?').get(email.trim().toLowerCase());
   if (!student || !student.password_hash || !bcrypt.compareSync(password || '', student.password_hash)) {
     return res.status(401).json({ error: 'メールアドレスまたはパスワードが正しくありません' });
   }
@@ -189,7 +182,12 @@ router.get('/ad-banners', (req, res) => {
 // ---- study summary（トレーニング画面の登頂標高に使う累計学習時間） ----
 router.get('/study-summary', (req, res) => {
   const row = db.prepare('SELECT COALESCE(SUM(study_min), 0) as total FROM speaking_stats WHERE student_id = ?').get(req.studentId);
-  res.json({ totalStudyMinutes: row.total });
+  // 「今日」は端末のローカル日付で判定する（サーバーはUTCのため日本時間の午前0〜9時にずれる）
+  const today = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.today)) ? String(req.query.today) : todayStr();
+  const t = db
+    .prepare('SELECT COALESCE(SUM(study_min), 0) as study, COALESCE(SUM(speak_min), 0) as speak FROM speaking_stats WHERE student_id = ? AND date = ?')
+    .get(req.studentId, today);
+  res.json({ totalStudyMinutes: row.total, todayStudyMinutes: t.study, todaySpeakMinutes: t.speak });
 });
 
 // ---- announcements（公開済みで自分宛て「全生徒」または所属グループ宛てのもの） ----
@@ -292,72 +290,7 @@ router.patch('/phrases/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-// ---- monthly mission（AI添削結果を管理画面と共有するテーブルに記録） ----
-router.post('/monthly-mission', (req, res) => {
-  const { pass } = req.body || {};
-  const month = todayStr().slice(0, 7);
-  const existing = db.prepare('SELECT id FROM monthly_mission_results WHERE student_id = ? AND month = ?').get(req.studentId, month);
-  if (existing) {
-    db.prepare('UPDATE monthly_mission_results SET pass = ?, date = ? WHERE id = ?').run(pass ? 1 : 0, todayStr(), existing.id);
-  } else {
-    db.prepare('INSERT INTO monthly_mission_results (student_id, month, pass, date) VALUES (?, ?, ?, ?)').run(
-      req.studentId,
-      month,
-      pass ? 1 : 0,
-      todayStr()
-    );
-  }
-  res.json({ ok: true });
-});
-
-function mondayOfStr(d) {
-  const x = jstDate(d);
-  const day = x.getUTCDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  x.setUTCDate(x.getUTCDate() + diff);
-  return x.toISOString().slice(0, 10);
-}
-
-// ---- daily mission（type: 'photo' | 'question'、1日1件ずつ記録） ----
-router.post('/daily-mission', (req, res) => {
-  const { type, pass } = req.body || {};
-  if (!['photo', 'question'].includes(type)) return res.status(400).json({ error: "type must be 'photo' or 'question'" });
-  const date = todayStr();
-  const existing = db
-    .prepare('SELECT id FROM daily_mission_results WHERE student_id = ? AND date = ? AND type = ?')
-    .get(req.studentId, date, type);
-  if (existing) {
-    db.prepare('UPDATE daily_mission_results SET pass = ? WHERE id = ?').run(pass ? 1 : 0, existing.id);
-  } else {
-    db.prepare('INSERT INTO daily_mission_results (student_id, date, type, pass) VALUES (?, ?, ?, ?)').run(
-      req.studentId,
-      date,
-      type,
-      pass ? 1 : 0
-    );
-  }
-  res.json({ ok: true });
-});
-
-// ---- weekly mission（週の月曜日始まりで1件ずつ記録） ----
-router.post('/weekly-mission', (req, res) => {
-  const { pass } = req.body || {};
-  const weekStart = mondayOfStr(new Date());
-  const existing = db
-    .prepare('SELECT id FROM weekly_mission_results WHERE student_id = ? AND week_start = ?')
-    .get(req.studentId, weekStart);
-  if (existing) {
-    db.prepare('UPDATE weekly_mission_results SET pass = ?, date = ? WHERE id = ?').run(pass ? 1 : 0, todayStr(), existing.id);
-  } else {
-    db.prepare('INSERT INTO weekly_mission_results (student_id, week_start, pass, date) VALUES (?, ?, ?, ?)').run(
-      req.studentId,
-      weekStart,
-      pass ? 1 : 0,
-      todayStr()
-    );
-  }
-  res.json({ ok: true });
-});
+// Daily/Weekly/Monthlyミッションの合否は、/api/grade がAI添削の結果からサーバー側で記録する（server/missions.js）
 
 // ---- weekly progress（STEP1〜6を順番に完了しないと次に進めない。週が変わると0に戻る） ----
 router.get('/weekly-progress', (req, res) => {
@@ -388,8 +321,9 @@ const AI_PERSONAS = {
 };
 
 router.post('/chat-ai', async (req, res) => {
-  const { persona, history = [] } = req.body || {};
-  const system = AI_PERSONAS[persona];
+  const { persona } = req.body || {};
+  const history = Array.isArray(req.body?.history) ? req.body.history : [];
+  const system = Object.prototype.hasOwnProperty.call(AI_PERSONAS, persona) ? AI_PERSONAS[persona] : null;
   if (!system) return res.status(400).json({ error: 'unknown persona' });
   const messages = history
     .slice(-12)

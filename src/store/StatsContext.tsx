@@ -1,9 +1,12 @@
 import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { apiGet } from '../api/mobileAuth';
+import { dateKey } from '../utils/dateHelpers';
 import { useSession } from './SessionContext';
 
 type StatsContextValue = {
   totalStudyMinutes: number;
+  todayStudyMinutes: number;
+  todaySpeakMinutes: number;
   reload: () => void;
 };
 
@@ -13,19 +16,29 @@ const StatsContext = createContext<StatsContextValue | null>(null);
 export function StatsProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useSession();
   const [totalStudyMinutes, setTotalStudyMinutes] = useState(0);
+  const [todayStudyMinutes, setTodayStudyMinutes] = useState(0);
+  const [todaySpeakMinutes, setTodaySpeakMinutes] = useState(0);
 
   const reload = () => {
-    apiGet<{ totalStudyMinutes: number }>('/study-summary')
-      .then((res) => setTotalStudyMinutes(res.totalStudyMinutes))
+    apiGet<{ totalStudyMinutes: number; todayStudyMinutes: number; todaySpeakMinutes: number }>(`/study-summary?today=${dateKey(new Date())}`)
+      .then((res) => {
+        setTotalStudyMinutes(res.totalStudyMinutes);
+        setTodayStudyMinutes(res.todayStudyMinutes);
+        setTodaySpeakMinutes(res.todaySpeakMinutes);
+      })
       .catch(() => {});
   };
 
   useEffect(() => {
     if (isAuthenticated) reload();
-    else setTotalStudyMinutes(0);
+    else {
+      setTotalStudyMinutes(0);
+      setTodayStudyMinutes(0);
+      setTodaySpeakMinutes(0);
+    }
   }, [isAuthenticated]);
 
-  return <StatsContext.Provider value={{ totalStudyMinutes, reload }}>{children}</StatsContext.Provider>;
+  return <StatsContext.Provider value={{ totalStudyMinutes, todayStudyMinutes, todaySpeakMinutes, reload }}>{children}</StatsContext.Provider>;
 }
 
 export function useStats() {
