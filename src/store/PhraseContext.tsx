@@ -2,7 +2,8 @@ import { createContext, ReactNode, useContext, useEffect, useMemo, useState } fr
 import { apiDelete, apiGet, apiPatch, apiPost } from '../api/mobileAuth';
 import { useSession } from './SessionContext';
 
-export type PhraseFolderSource = 'official' | 'custom';
+// curated=カスタマイズ教材（プロフィール連動）、official=運営提供（レベル別）、custom=マイフォルダ（自由に編集可）
+export type PhraseFolderSource = 'curated' | 'official' | 'custom';
 export type PhraseFolder = { id: number; name: string; source: PhraseFolderSource };
 export type Phrase = { id: number; folder_id: number; text: string; text_jp: string; learned: number };
 
@@ -14,6 +15,8 @@ type PhraseContextValue = {
   folderCount: (folderId: number) => number;
   addFolder: (name: string) => Promise<number>;
   deleteFolder: (id: number) => void;
+  renameFolder: (id: number, name: string) => void;
+  deletePhrase: (id: number) => void;
   toggleLearned: (id: number) => void;
   registerState: RegisterState;
   openRegister: (text: string, editable: boolean, folderId?: number | null, textJP?: string) => void;
@@ -66,6 +69,16 @@ export function PhraseProvider({ children }: { children: ReactNode }) {
     await apiDelete(`/phrase-folders/${id}`).catch(() => load().catch(() => {}));
   };
 
+  const renameFolder = async (id: number, name: string) => {
+    setFolders((prev) => prev.map((f) => (f.id === id ? { ...f, name } : f)));
+    await apiPatch(`/phrase-folders/${id}`, { name }).catch(() => load().catch(() => {}));
+  };
+
+  const deletePhrase = async (id: number) => {
+    setPhrases((prev) => prev.filter((p) => p.id !== id));
+    await apiDelete(`/phrases/${id}`).catch(() => load().catch(() => {}));
+  };
+
   const toggleLearned = async (id: number) => {
     const target = phrases.find((p) => p.id === id);
     if (!target) return;
@@ -75,7 +88,7 @@ export function PhraseProvider({ children }: { children: ReactNode }) {
   };
 
   const openRegister = (text: string, editable: boolean, folderId: number | null = null, textJP = '') => {
-    setRegisterState({ visible: true, text, textJP, editable, folderId: folderId ?? folders[0]?.id ?? null, editId: null });
+    setRegisterState({ visible: true, text, textJP, editable, folderId: folderId ?? folders.find((f) => f.source === 'custom')?.id ?? null, editId: null });
   };
 
   const openEdit = (p: Phrase) => {
@@ -101,7 +114,7 @@ export function PhraseProvider({ children }: { children: ReactNode }) {
   };
 
   const value = useMemo(
-    () => ({ folders, phrases, folderCount, addFolder, deleteFolder, toggleLearned, registerState, openRegister, openEdit, closeRegister, confirmRegister }),
+    () => ({ folders, phrases, folderCount, addFolder, deleteFolder, renameFolder, deletePhrase, toggleLearned, registerState, openRegister, openEdit, closeRegister, confirmRegister }),
     [folders, phrases, registerState]
   );
 

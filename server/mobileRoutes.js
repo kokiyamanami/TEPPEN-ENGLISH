@@ -8,6 +8,7 @@ const OpenAI = require('openai');
 const db = require('./db');
 const { todayStr, mondayOfStr } = require('./dateUtil');
 const { lookupDictionary } = require('./dictionary');
+const { syncDecks } = require('./phraseDecks');
 const { REST_LIMIT_PER_MONTH, goalHistory, restDays, currentGoal } = require('./goals');
 
 const router = express.Router();
@@ -22,7 +23,7 @@ const avatarUpload = multer({ dest: '/tmp/teppen-uploads/', limits: { fileSize: 
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const DEFAULT_OFFICIAL_FOLDERS = ['重要構文40', 'お役立ちフレーズ50'];
+const DEFAULT_MY_FOLDER = 'マイフレーズ';
 
 function requireAuth(req, res, next) {
   const header = req.headers.authorization || '';
@@ -63,9 +64,7 @@ router.post('/signup', (req, res) => {
 
   const hasFolders = db.prepare('SELECT id FROM phrase_folders WHERE student_id = ? LIMIT 1').get(studentId);
   if (!hasFolders) {
-    DEFAULT_OFFICIAL_FOLDERS.forEach((name) => {
-      db.prepare('INSERT INTO phrase_folders (student_id, name, source) VALUES (?, ?, ?)').run(studentId, name, 'official');
-    });
+    db.prepare('INSERT INTO phrase_folders (student_id, name, source) VALUES (?, ?, ?)').run(studentId, DEFAULT_MY_FOLDER, 'custom');
   }
 
   const token = jwt.sign({ id: studentId }, JWT_SECRET, { expiresIn: '365d' });
@@ -303,6 +302,7 @@ router.delete('/records/:id', (req, res) => {
 
 // ---- phrases / folders ----
 router.get('/phrase-folders', (req, res) => {
+  syncDecks(req.studentId);
   res.json(db.prepare('SELECT * FROM phrase_folders WHERE student_id = ? ORDER BY id').all(req.studentId));
 });
 
@@ -313,20 +313,32 @@ router.post('/phrase-folders', (req, res) => {
   res.json({ id: info.lastInsertRowid });
 });
 
+// マイフォルダ（custom）だけ、生徒が名前変更・削除できる。運営提供・カスタマイズ教材は変更不可
+router.patch('/phrase-folders/:id', (req, res) => {
+  const name = String(req.body?.name || '').trim();
+  if (!name) return res.status(400).json({ error: 'name is required' });
+  const info = db.prepare("UPDATE phrase_folders SET name = ? WHERE id = ? AND student_id = ? AND source = 'custom'").run(name, req.params.id, req.studentId);
+  if (!info.changes) return res.status(404).json({ error: 'not_found' });
+  res.json({ ok: true });
+});
+
 router.delete('/phrase-folders/:id', (req, res) => {
-  db.prepare('DELETE FROM phrases WHERE folder_id = ? AND student_id = ?').run(req.params.id, req.studentId);
-  db.prepare("DELETE FROM phrase_folders WHERE id = ? AND student_id = ? AND source = 'custom'").run(req.params.id, req.studentId);
+  const folder = db.prepare("SELECT id FROM phrase_folders WHERE id = ? AND student_id = ? AND source = 'custom'").get(req.params.id, req.studentId);
+  if (!folder) return res.status(404).json({ error: 'not_found' });
+  db.prepare('DELETE FROM phrases WHERE folder_id = ? AND student_id = ?').run(folder.id, req.studentId);
+  db.prepare('DELETE FROM phrase_folders WHERE id = ?').run(folder.id);
   res.json({ ok: true });
 });
 
 router.get('/phrases', (req, res) => {
+  syncDecks(req.studentId);
   res.json(db.prepare('SELECT * FROM phrases WHERE student_id = ? ORDER BY id').all(req.studentId));
 });
 
 router.post('/phrases', (req, res) => {
   const { folderId, text, textJP = '' } = req.body || {};
   if (!folderId || !text) return res.status(400).json({ error: 'folderId and text are required' });
-  const folder = db.prepare('SELECT id FROM phrase_folders WHERE id = ? AND student_id = ?').get(folderId, req.studentId);
+  const folder = db.prepare("SELECT id FROM phrase_folders WHERE id = ? AND student_id = ? AND source = 'custom'").get(folderId, req.studentId);
   if (!folder) return res.status(404).json({ error: 'folder_not_found' });
   const info = db
     .prepare('INSERT INTO phrases (student_id, folder_id, text, text_jp, learned) VALUES (?, ?, ?, ?, 0)')
@@ -337,16 +349,28 @@ router.post('/phrases', (req, res) => {
 router.patch('/phrases/:id', (req, res) => {
   const { learned, text, textJP, folderId } = req.body || {};
   const has = (k) => Object.prototype.hasOwnProperty.call(req.body || {}, k);
-  const phrase = db.prepare('SELECT id FROM phrases WHERE id = ? AND student_id = ?').get(req.params.id, req.studentId);
+  const phrase = db
+    .prepare('SELECT p.id, f.source FROM phrases p JOIN phrase_folders f ON f.id = p.folder_id WHERE p.id = ? AND p.student_id = ?')
+    .get(req.params.id, req.studentId);
   if (!phrase) return res.status(404).json({ error: 'not_found' });
+  // 運営提供・カスタマイズ教材の中身は変更できない（覚えた状態のみ切り替え可）
+  if (phrase.source !== 'custom' && (has('text') || has('textJP') || has('folderId'))) return res.status(403).json({ error: 'read_only' });
   if (has('text') && !String(text || '').trim()) return res.status(400).json({ error: 'text_required' });
-  if (has('folderId') && !db.prepare('SELECT id FROM phrase_folders WHERE id = ? AND student_id = ?').get(folderId, req.studentId)) {
+  if (has('folderId') && !db.prepare("SELECT id FROM phrase_folders WHERE id = ? AND student_id = ? AND source = 'custom'").get(folderId, req.studentId)) {
     return res.status(404).json({ error: 'folder_not_found' });
   }
   if (has('learned')) db.prepare('UPDATE phrases SET learned = ? WHERE id = ?').run(learned ? 1 : 0, phrase.id);
   if (has('text')) db.prepare('UPDATE phrases SET text = ? WHERE id = ?').run(String(text).trim(), phrase.id);
   if (has('textJP')) db.prepare('UPDATE phrases SET text_jp = ? WHERE id = ?').run(String(textJP ?? '').trim(), phrase.id);
   if (has('folderId')) db.prepare('UPDATE phrases SET folder_id = ? WHERE id = ?').run(folderId, phrase.id);
+  res.json({ ok: true });
+});
+
+router.delete('/phrases/:id', (req, res) => {
+  const info = db
+    .prepare("DELETE FROM phrases WHERE id = ? AND student_id = ? AND folder_id IN (SELECT id FROM phrase_folders WHERE source = 'custom')")
+    .run(req.params.id, req.studentId);
+  if (!info.changes) return res.status(404).json({ error: 'not_found' });
   res.json({ ok: true });
 });
 

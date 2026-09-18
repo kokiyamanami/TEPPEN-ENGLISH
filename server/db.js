@@ -60,6 +60,24 @@ CREATE TABLE IF NOT EXISTS rest_days (
   PRIMARY KEY (student_id, date)
 );
 
+-- 運営が用意するフレーズ教材。kind='official'はレベル(Phase)別、'curated'はプロフィール(職業・趣味・性格・経歴)に合わせたカスタマイズ教材
+CREATE TABLE IF NOT EXISTS phrase_decks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind TEXT NOT NULL,
+  name TEXT NOT NULL,
+  level INTEGER,
+  attr TEXT,
+  attr_value TEXT
+);
+
+CREATE TABLE IF NOT EXISTS phrase_deck_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  deck_id INTEGER NOT NULL REFERENCES phrase_decks(id),
+  text TEXT NOT NULL,
+  text_jp TEXT NOT NULL DEFAULT '',
+  sort_order INTEGER NOT NULL DEFAULT 0
+);
+
 -- 1日に複数件登録できるよう、student_id×dateのUNIQUE制約は付けない
 CREATE TABLE IF NOT EXISTS speaking_stats (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -204,6 +222,14 @@ if (!studentCols.includes('onboarding_complete')) {
 }
 if (!studentCols.includes('avatar_url')) {
   db.exec('ALTER TABLE students ADD COLUMN avatar_url TEXT');
+}
+const phraseFolderCols = db.prepare('PRAGMA table_info(phrase_folders)').all().map((c) => c.name);
+if (!phraseFolderCols.includes('deck_id')) {
+  db.exec('ALTER TABLE phrase_folders ADD COLUMN deck_id INTEGER REFERENCES phrase_decks(id)');
+}
+const phraseCols = db.prepare('PRAGMA table_info(phrases)').all().map((c) => c.name);
+if (!phraseCols.includes('deck_item_id')) {
+  db.exec('ALTER TABLE phrases ADD COLUMN deck_item_id INTEGER REFERENCES phrase_deck_items(id)');
 }
 const adBannerCols = db.prepare('PRAGMA table_info(ad_banners)').all().map((c) => c.name);
 if (!adBannerCols.includes('placement')) {

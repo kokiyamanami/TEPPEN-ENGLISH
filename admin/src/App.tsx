@@ -10,6 +10,7 @@ import Groups from './pages/Groups';
 import Lectures from './pages/Lectures';
 import Login from './pages/Login';
 import Materials from './pages/Materials';
+import PhraseDecks from './pages/PhraseDecks';
 import Overview from './pages/Overview';
 import Settings from './pages/Settings';
 import StudentDetail from './pages/StudentDetail';
@@ -83,6 +84,14 @@ export default function App() {
               element={
                 <RequireAuth>
                   <Coaches />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/phrase-decks"
+              element={
+                <RequireAuth>
+                  <PhraseDecks />
                 </RequireAuth>
               }
             />

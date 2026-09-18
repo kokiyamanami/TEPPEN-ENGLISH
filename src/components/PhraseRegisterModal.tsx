@@ -1,13 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePhrases } from '../store/PhraseContext';
 import { colors, radius, spacing } from '../theme/colors';
 
 export function PhraseRegisterModal() {
   const insets = useSafeAreaInsets();
-  const { registerState, closeRegister, confirmRegister, folders, addFolder } = usePhrases();
+  const { registerState, closeRegister, confirmRegister, folders, addFolder, deletePhrase } = usePhrases();
+  const myFolders = folders.filter((f) => f.source === 'custom');
   const [text, setText] = useState('');
   const [textJP, setTextJP] = useState('');
   const [folderId, setFolderId] = useState<number | null>(null);
@@ -62,9 +63,9 @@ export function PhraseRegisterModal() {
             placeholderTextColor={colors.textSecondary}
           />
 
-          <Text style={styles.label}>カテゴリを選ぶ</Text>
+          <Text style={styles.label}>マイフォルダを選ぶ</Text>
           <View style={styles.chipRow}>
-            {folders.map((f) => (
+            {myFolders.map((f) => (
               <Pressable
                 key={f.id}
                 style={[styles.chip, folderId === f.id && styles.chipSel]}
@@ -92,6 +93,27 @@ export function PhraseRegisterModal() {
                 <Text style={styles.newFolderBtnText}>追加</Text>
               </Pressable>
             </View>
+          )}
+
+          {registerState.editId !== null && (
+            <Pressable
+              style={styles.deleteLink}
+              onPress={() =>
+                Alert.alert('このフレーズを削除しますか？', '元に戻せません。', [
+                  { text: 'キャンセル', style: 'cancel' },
+                  {
+                    text: '削除する',
+                    style: 'destructive',
+                    onPress: () => {
+                      deletePhrase(registerState.editId as number);
+                      closeRegister();
+                    },
+                  },
+                ])
+              }
+            >
+              <Text style={styles.deleteLinkText}>このフレーズを削除</Text>
+            </Pressable>
           )}
 
           <View style={styles.rowBtn}>
@@ -129,6 +151,8 @@ const styles = StyleSheet.create({
   newFolderInput: { flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: spacing.sm, fontSize: 13, color: colors.textPrimary },
   newFolderBtn: { backgroundColor: colors.coral, borderRadius: radius.sm, paddingHorizontal: spacing.md, alignItems: 'center', justifyContent: 'center' },
   newFolderBtnText: { color: colors.white, fontWeight: '700', fontSize: 12 },
+  deleteLink: { alignSelf: 'flex-start', marginTop: spacing.md },
+  deleteLinkText: { color: colors.danger, fontSize: 12, fontWeight: '600' },
   rowBtn: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
   cancelBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: spacing.md, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border },
   cancelText: { color: colors.textPrimary, fontWeight: '600' },

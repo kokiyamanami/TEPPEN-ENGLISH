@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const db = require('./db');
 const { todayStr } = require('./dateUtil');
+const { removeDeck } = require('./phraseDecks');
 const { goalHistory, restDays, currentGoal } = require('./goals');
 
 const router = express.Router();
@@ -404,6 +405,87 @@ router.patch('/materials/:id', (req, res) => {
     req.params.id
   );
   res.json({ ok: true });
+});
+
+// ---- phrase decks（MYフレーズの運営提供・カスタマイズ教材） ----
+const DECK_ATTRS = ['job', 'hobby', 'personality', 'career'];
+
+function parseDeck(body) {
+  const kind = body.kind;
+  const name = String(body.name || '').trim();
+  if (!['official', 'curated'].includes(kind) || !name) return { error: 'kind and name are required' };
+  if (kind === 'official') {
+    const level = Number(body.level);
+    if (!Number.isInteger(level) || level < 1 || level > 5) return { error: 'level must be 1-5' };
+    return { kind, name, level, attr: null, attr_value: null };
+  }
+  const value = String(body.attrValue || '').trim();
+  if (!DECK_ATTRS.includes(body.attr) || !value) return { error: 'attr and attrValue are required' };
+  return { kind, name, level: null, attr: body.attr, attr_value: value };
+}
+
+router.get('/phrase-decks', (req, res) => {
+  res.json(
+    db
+      .prepare(
+        `SELECT d.*, (SELECT COUNT(*) FROM phrase_deck_items i WHERE i.deck_id = d.id) as item_count,
+                (SELECT COUNT(*) FROM phrase_folders f WHERE f.deck_id = d.id) as student_count
+         FROM phrase_decks d ORDER BY d.kind DESC, d.level, d.id`
+      )
+      .all()
+  );
+});
+
+router.post('/phrase-decks', (req, res) => {
+  const d = parseDeck(req.body || {});
+  if (d.error) return res.status(400).json({ error: d.error });
+  const info = db.prepare('INSERT INTO phrase_decks (kind, name, level, attr, attr_value) VALUES (?, ?, ?, ?, ?)').run(d.kind, d.name, d.level, d.attr, d.attr_value);
+  res.json({ id: info.lastInsertRowid });
+});
+
+router.patch('/phrase-decks/:id', (req, res) => {
+  const d = parseDeck(req.body || {});
+  if (d.error) return res.status(400).json({ error: d.error });
+  db.prepare('UPDATE phrase_decks SET kind = ?, name = ?, level = ?, attr = ?, attr_value = ? WHERE id = ?').run(d.kind, d.name, d.level, d.attr, d.attr_value, req.params.id);
+  res.json({ ok: true });
+});
+
+router.delete('/phrase-decks/:id', (req, res) => {
+  removeDeck(req.params.id);
+  res.json({ ok: true });
+});
+
+router.get('/phrase-decks/:id/items', (req, res) => {
+  res.json(db.prepare('SELECT id, text, text_jp FROM phrase_deck_items WHERE deck_id = ? ORDER BY sort_order, id').all(req.params.id));
+});
+
+// 項目を丸ごと置き換える。同じ英文は既存の項目を引き継ぐ（生徒の「覚えた」状態を保つため）
+router.put('/phrase-decks/:id/items', (req, res) => {
+  const items = Array.isArray(req.body?.items) ? req.body.items : [];
+  const clean = items.map((i) => ({ text: String(i.text || '').trim(), textJP: String(i.textJP || '').trim() })).filter((i) => i.text);
+  const existing = db.prepare('SELECT id, text FROM phrase_deck_items WHERE deck_id = ?').all(req.params.id);
+  const byText = new Map(existing.map((e) => [e.text, e.id]));
+  const keep = new Set();
+  db.transaction(() => {
+    clean.forEach((it, idx) => {
+      const id = byText.get(it.text);
+      if (id) {
+        db.prepare('UPDATE phrase_deck_items SET text_jp = ?, sort_order = ? WHERE id = ?').run(it.textJP, idx, id);
+        keep.add(id);
+      } else {
+        const info = db.prepare('INSERT INTO phrase_deck_items (deck_id, text, text_jp, sort_order) VALUES (?, ?, ?, ?)').run(req.params.id, it.text, it.textJP, idx);
+        keep.add(Number(info.lastInsertRowid));
+      }
+    });
+    // 配布済みの生徒のフレーズが項目を参照している（外部キー）ため、先に生徒側を消す
+    existing
+      .filter((e) => !keep.has(e.id))
+      .forEach((e) => {
+        db.prepare('DELETE FROM phrases WHERE deck_item_id = ?').run(e.id);
+        db.prepare('DELETE FROM phrase_deck_items WHERE id = ?').run(e.id);
+      });
+  })();
+  res.json({ ok: true, count: clean.length });
 });
 
 // ---- announcements ----

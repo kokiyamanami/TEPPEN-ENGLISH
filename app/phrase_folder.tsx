@@ -37,10 +37,12 @@ export default function PhraseFolderScreen() {
       <View style={styles.screen}>
         <TopBar title={folder.name} backRoute="/phrase" />
         <Text style={styles.empty}>まだフレーズがありません</Text>
-        <Pressable style={styles.addBtn} onPress={() => openRegister('', true, folder.id)}>
-          <Ionicons name="add" size={14} color={colors.coral} />
-          <Text style={styles.addBtnText}>このカテゴリにフレーズを追加</Text>
-        </Pressable>
+        {folder.source === 'custom' && (
+          <Pressable style={styles.addBtn} onPress={() => openRegister('', true, folder.id)}>
+            <Ionicons name="add" size={14} color={colors.coral} />
+            <Text style={styles.addBtnText}>このフォルダにフレーズを追加</Text>
+          </Pressable>
+        )}
       </View>
     );
   }
@@ -90,9 +92,11 @@ export default function PhraseFolderScreen() {
                   <Pressable style={styles.iconBtn} onPress={() => setShowJP((v) => !v)} hitSlop={8}>
                     <Ionicons name={showJP ? 'eye-off-outline' : 'eye-outline'} size={16} color={colors.textPrimary} />
                   </Pressable>
-                  <Pressable style={styles.iconBtn} onPress={() => openEdit(p)} hitSlop={8}>
-                    <Ionicons name="create-outline" size={16} color={colors.textPrimary} />
-                  </Pressable>
+                  {folder.source === 'custom' && (
+                    <Pressable style={styles.iconBtn} onPress={() => openEdit(p)} hitSlop={8}>
+                      <Ionicons name="create-outline" size={16} color={colors.textPrimary} />
+                    </Pressable>
+                  )}
                 </View>
               )}
             </View>
@@ -111,10 +115,12 @@ export default function PhraseFolderScreen() {
         <Text style={[styles.learnedText, !!current.learned && styles.learnedTextDone]}>覚えた ✓</Text>
       </Pressable>
 
-      <Pressable style={styles.addBtn} onPress={() => openRegister('', true, folder.id)}>
-        <Ionicons name="add" size={14} color={colors.coral} />
-        <Text style={styles.addBtnText}>このカテゴリにフレーズを追加</Text>
-      </Pressable>
+      {folder.source === 'custom' && (
+        <Pressable style={styles.addBtn} onPress={() => openRegister('', true, folder.id)}>
+          <Ionicons name="add" size={14} color={colors.coral} />
+          <Text style={styles.addBtnText}>このフォルダにフレーズを追加</Text>
+        </Pressable>
+      )}
     </View>
   );
 }
