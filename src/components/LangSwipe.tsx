@@ -43,7 +43,7 @@ export function LangSwipe({ en, jp }: { en: ReactNode; jp: ReactNode }) {
           <Text style={[styles.dotText, page === 1 && styles.dotTextActive]}>日本語</Text>
         </Pressable>
       </View>
-      <Text style={styles.hint}>← 横にスワイプすると日本語が表示されます →</Text>
+      <Text style={styles.hint}>← 横にスワイプで日本語 ／ 単語の長押しで意味を表示 →</Text>
     </View>
   );
 }

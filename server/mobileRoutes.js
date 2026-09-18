@@ -393,6 +393,49 @@ router.post('/chat-ai', async (req, res) => {
   }
 });
 
+// ---- 単語の意味（英文中の単語を長押しした時の簡易辞書。文脈に合った意味をLLMで返す） ----
+const wordLookupCache = new Map();
+
+router.post('/word-lookup', async (req, res) => {
+  const word = String(req.body?.word || '').trim().slice(0, 60);
+  const sentence = String(req.body?.sentence || '').trim().slice(0, 400);
+  if (!word) return res.status(400).json({ error: 'word is required' });
+
+  const cacheKey = `${word.toLowerCase()}::${sentence}`;
+  if (wordLookupCache.has(cacheKey)) return res.json(wordLookupCache.get(cacheKey));
+
+  try {
+    const resp = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      response_format: { type: 'json_object' },
+      max_tokens: 300,
+      messages: [
+        {
+          role: 'system',
+          content:
+            'あなたは日本人英語学習者向けの英和辞書です。与えられた英単語について、与えられた文の文脈での意味を答えてください。' +
+            '必ず次のJSON形式のみで回答: {"word": "見出し語（原形）", "pos": "品詞（日本語。例: 名詞・動詞・形容詞）", "meaning": "この文脈での簡潔な日本語の意味", "exampleEN": "短い英語の例文", "exampleJP": "例文の日本語訳"}',
+        },
+        { role: 'user', content: `単語: ${word}\n文: ${sentence || '(文脈なし)'}` },
+      ],
+    });
+    const parsed = JSON.parse(resp.choices[0].message.content);
+    const result = {
+      word: String(parsed.word || word),
+      pos: String(parsed.pos || ''),
+      meaning: String(parsed.meaning || ''),
+      exampleEN: String(parsed.exampleEN || ''),
+      exampleJP: String(parsed.exampleJP || ''),
+    };
+    if (wordLookupCache.size > 500) wordLookupCache.clear();
+    wordLookupCache.set(cacheKey, result);
+    res.json(result);
+  } catch (err) {
+    console.error('word-lookup error:', err);
+    res.status(500).json({ error: 'word_lookup_failed' });
+  }
+});
+
 // ---- mission history（記録画面の「スピーキング履歴」表示用にまとめて取得） ----
 router.get('/mission-history', (req, res) => {
   const daily = db

@@ -7,6 +7,7 @@ import { ProfileProvider } from './ProfileContext';
 import { SessionProvider } from './SessionContext';
 import { StatsProvider } from './StatsContext';
 import { TalkProvider } from './TalkContext';
+import { WordLookupProvider } from './WordLookupContext';
 
 export function AppProviders({ children }: { children: ReactNode }) {
   return (
@@ -17,7 +18,9 @@ export function AppProviders({ children }: { children: ReactNode }) {
             <PhraseProvider>
               <TalkProvider>
                 <GoalsProvider>
-                  <GeneratedContentProvider>{children}</GeneratedContentProvider>
+                  <GeneratedContentProvider>
+                    <WordLookupProvider>{children}</WordLookupProvider>
+                  </GeneratedContentProvider>
                 </GoalsProvider>
               </TalkProvider>
             </PhraseProvider>

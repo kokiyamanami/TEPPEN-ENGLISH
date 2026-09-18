@@ -3,6 +3,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { ReactNode, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { apiPost } from '../src/api/mobileAuth';
+import { EnglishText } from '../src/components/EnglishText';
 import { LangSwipe } from '../src/components/LangSwipe';
 import { TopBar } from '../src/components/TopBar';
 import { TtsLineButton } from '../src/components/TtsLineButton';
@@ -51,6 +52,7 @@ export default function WeeklyStepScreen() {
       <TopBar title={`STEP${def.step} ${def.title}`} backRoute="/weekly_material" />
       <ScrollView>
         <Text style={styles.desc}>{def.desc}</Text>
+        {step >= 3 && <Text style={styles.hint}>英文の単語を長押しすると意味が表示されます</Text>}
         {content}
         <Pressable style={[styles.cta, !canComplete && styles.ctaDisabled]} onPress={complete} disabled={!canComplete || saving}>
           <Text style={styles.ctaText}>{saving ? '保存中…' : step === 6 ? 'STEP6を完了する（テストが解放されます）' : 'このステップを完了する'}</Text>
@@ -175,18 +177,22 @@ type Material = ReturnType<typeof generateWeeklyMaterial>;
 
 // ---- STEP3 スラッシュリーディング（英文を横にスワイプすると日本語） ----
 function SlashStep({ w }: { w: Material }) {
-  const card = (texts: string[]) => (
+  const card = (texts: string[], english: boolean) => (
     <View style={styles.paraCard}>
-      {texts.map((t, i) => (
-        <Text key={i} style={styles.paraText}>
-          {t}
-        </Text>
-      ))}
+      {texts.map((t, i) =>
+        english ? (
+          <EnglishText key={i} text={t} style={styles.paraText} />
+        ) : (
+          <Text key={i} style={styles.paraText}>
+            {t}
+          </Text>
+        )
+      )}
     </View>
   );
   return (
     <View style={styles.swipeWrap}>
-      <LangSwipe en={card(w.paragraphsEN.map(toSlashReading))} jp={card(w.paragraphsJP)} />
+      <LangSwipe en={card(w.paragraphsEN.map(toSlashReading), true)} jp={card(w.paragraphsJP, false)} />
     </View>
   );
 }
@@ -197,9 +203,7 @@ function ReadAloudStep({ w, voice }: { w: Material; voice: ReturnType<typeof voi
     <>
       <View style={[styles.paraCard, styles.swipeWrap]}>
         {w.paragraphsEN.map((t, i) => (
-          <Text key={i} style={styles.paraText}>
-            {t}
-          </Text>
+          <EnglishText key={i} text={t} style={styles.paraText} />
         ))}
       </View>
       <View style={styles.playerCard}>
@@ -222,11 +226,7 @@ function ShadowingStep({ w, voice }: { w: Material; voice: ReturnType<typeof voi
         {hidden ? (
           <Text style={styles.hiddenNote}>音声を聞きながら、少し遅れて真似して声に出しましょう。詰まったらテキストを表示して確認できます。</Text>
         ) : (
-          w.paragraphsEN.map((t, i) => (
-            <Text key={i} style={styles.paraText}>
-              {t}
-            </Text>
-          ))
+          w.paragraphsEN.map((t, i) => <EnglishText key={i} text={t} style={styles.paraText} />)
         )}
       </View>
       <View style={styles.playerCard}>
@@ -252,7 +252,7 @@ function BackTranslationStep({ w, voice, onAllRevealed }: { w: Material; voice: 
           <Text style={styles.paraText}>{jp}</Text>
           {revealed.has(i) ? (
             <View style={styles.answerBox}>
-              <Text style={styles.paraText}>{w.paragraphsEN[i]}</Text>
+              <EnglishText text={w.paragraphsEN[i]} style={styles.paraText} />
               <TtsLineButton text={w.paragraphsEN[i]} voice={voice} style={styles.roundBtn} />
             </View>
           ) : (
@@ -270,6 +270,7 @@ function BackTranslationStep({ w, voice, onAllRevealed }: { w: Material; voice: 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   desc: { fontSize: 12, color: colors.textSecondary, marginHorizontal: spacing.lg, marginTop: spacing.md, lineHeight: 18 },
+  hint: { fontSize: 11, color: colors.coral, marginHorizontal: spacing.lg, marginTop: spacing.xs },
   card: { margin: spacing.lg, backgroundColor: colors.white, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: spacing.md },
   vocabRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
   rowBordered: { borderTopWidth: 1, borderTopColor: colors.border },

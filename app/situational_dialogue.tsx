@@ -3,6 +3,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { generateDialogueRemote } from '../src/api/generation';
+import { EnglishText } from '../src/components/EnglishText';
 import { LangSwipe } from '../src/components/LangSwipe';
 import { TopBar } from '../src/components/TopBar';
 import { TtsLineButton } from '../src/components/TtsLineButton';
@@ -104,7 +105,7 @@ export default function SituationalDialogueScreen() {
                     return (
                       <View key={i} style={[styles.lineRow, isMe && styles.lineRowMe]}>
                         <View style={[styles.bubble, isMe && styles.bubbleMe]}>
-                          <Text style={[styles.bubbleText, isMe && styles.bubbleTextMe]}>{slashed ? toSlashReading(line.text) : line.text}</Text>
+                          <EnglishText text={slashed ? toSlashReading(line.text) : line.text} style={[styles.bubbleText, isMe && styles.bubbleTextMe]} />
                         </View>
                         <View style={[styles.lineToolbar, isMe && styles.lineToolbarMe]}>
                           <TtsLineButton text={line.text} voice={voice} style={styles.lineBtn} />

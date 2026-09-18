@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { generatePresentationRemote } from '../src/api/generation';
+import { EnglishText } from '../src/components/EnglishText';
 import { LangSwipe } from '../src/components/LangSwipe';
 import { TopBar } from '../src/components/TopBar';
 import { TtsPlayerBar } from '../src/components/TtsPlayerBar';
@@ -90,9 +91,7 @@ export default function PresentationMaterialScreen() {
               en={
                 <View style={styles.paragraphCard}>
                   {enBlocks.map((t, i) => (
-                    <Text key={i} style={styles.paragraphText}>
-                      {t}
-                    </Text>
+                    <EnglishText key={i} text={t} style={styles.paragraphText} />
                   ))}
                 </View>
               }
