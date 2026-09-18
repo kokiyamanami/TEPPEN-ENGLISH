@@ -79,6 +79,14 @@ CREATE TABLE IF NOT EXISTS daily_mission_results (
   pass INTEGER NOT NULL
 );
 
+-- Weeklyミッションの教材ステップ(1〜6)＋テスト(7)の進捗。週(月曜始まり)ごとに1行
+CREATE TABLE IF NOT EXISTS weekly_progress (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  student_id INTEGER REFERENCES students(id),
+  week_start TEXT NOT NULL,
+  completed_step INTEGER NOT NULL DEFAULT 0
+);
+
 CREATE TABLE IF NOT EXISTS weekly_mission_results (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   student_id INTEGER REFERENCES students(id),

@@ -3,6 +3,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { generateDialogueRemote } from '../src/api/generation';
+import { LangSwipe } from '../src/components/LangSwipe';
 import { TopBar } from '../src/components/TopBar';
 import { TtsLineButton } from '../src/components/TtsLineButton';
 import { TtsPlayerBar } from '../src/components/TtsPlayerBar';
@@ -20,7 +21,6 @@ export default function SituationalDialogueScreen() {
   const scene = sceneParam ?? '同僚との会話';
 
   const [regenUsed, setRegenUsed] = useState(false);
-  const [langPage, setLangPage] = useState<0 | 1>(0);
   const [slashLines, setSlashLines] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
   const [dialogue, setDialogue] = useState<Dialogue>(() => generateDialogue(scene, 0));
@@ -87,15 +87,6 @@ export default function SituationalDialogueScreen() {
         <Text style={styles.counterpart}>相手役：{dialogue.counterpart}</Text>
       </View>
 
-      <View style={styles.langTabs}>
-        <Pressable style={[styles.langTab, langPage === 0 && styles.langTabSel]} onPress={() => setLangPage(0)}>
-          <Text style={[styles.langTabText, langPage === 0 && styles.langTabTextSel]}>EN</Text>
-        </Pressable>
-        <Pressable style={[styles.langTab, langPage === 1 && styles.langTabSel]} onPress={() => setLangPage(1)}>
-          <Text style={[styles.langTabText, langPage === 1 && styles.langTabTextSel]}>日本語</Text>
-        </Pressable>
-      </View>
-
       {loading ? (
         <View style={styles.loadingWrap}>
           <ActivityIndicator color={colors.coral} />
@@ -104,30 +95,46 @@ export default function SituationalDialogueScreen() {
       ) : (
         <>
           <View style={styles.lines}>
-            {dialogue.lines.map((line, i) => {
-              const isMe = line.from === 'me';
-              const slashed = slashLines.has(i);
-              return (
-                <View key={i} style={[styles.lineRow, isMe && styles.lineRowMe]}>
-                  <View style={[styles.bubble, isMe && styles.bubbleMe]}>
-                    <Text style={[styles.bubbleText, isMe && styles.bubbleTextMe]}>
-                      {langPage === 0 ? (slashed ? toSlashReading(line.text) : line.text) : line.textJP}
-                    </Text>
-                  </View>
-                  {langPage === 0 && (
-                    <View style={[styles.lineToolbar, isMe && styles.lineToolbarMe]}>
-                      <TtsLineButton text={line.text} voice={voice} style={styles.lineBtn} />
-                      <Pressable style={[styles.lineBtn, slashed && styles.lineBtnActive]} onPress={() => toggleSlash(i)} hitSlop={8}>
-                        <Text style={[styles.slashIcon, slashed && styles.slashIconActive]}>/</Text>
-                      </Pressable>
-                      <Pressable style={styles.lineBtn} onPress={() => registerPhrase(line.text)} hitSlop={8}>
-                        <Ionicons name="bookmark-outline" size={13} color={colors.textPrimary} />
-                      </Pressable>
-                    </View>
-                  )}
+            <LangSwipe
+              en={
+                <View style={styles.linesInner}>
+                  {dialogue.lines.map((line, i) => {
+                    const isMe = line.from === 'me';
+                    const slashed = slashLines.has(i);
+                    return (
+                      <View key={i} style={[styles.lineRow, isMe && styles.lineRowMe]}>
+                        <View style={[styles.bubble, isMe && styles.bubbleMe]}>
+                          <Text style={[styles.bubbleText, isMe && styles.bubbleTextMe]}>{slashed ? toSlashReading(line.text) : line.text}</Text>
+                        </View>
+                        <View style={[styles.lineToolbar, isMe && styles.lineToolbarMe]}>
+                          <TtsLineButton text={line.text} voice={voice} style={styles.lineBtn} />
+                          <Pressable style={[styles.lineBtn, slashed && styles.lineBtnActive]} onPress={() => toggleSlash(i)} hitSlop={8}>
+                            <Text style={[styles.slashIcon, slashed && styles.slashIconActive]}>/</Text>
+                          </Pressable>
+                          <Pressable style={styles.lineBtn} onPress={() => registerPhrase(line.text)} hitSlop={8}>
+                            <Ionicons name="bookmark-outline" size={13} color={colors.textPrimary} />
+                          </Pressable>
+                        </View>
+                      </View>
+                    );
+                  })}
                 </View>
-              );
-            })}
+              }
+              jp={
+                <View style={styles.linesInner}>
+                  {dialogue.lines.map((line, i) => {
+                    const isMe = line.from === 'me';
+                    return (
+                      <View key={i} style={[styles.lineRow, isMe && styles.lineRowMe]}>
+                        <View style={[styles.bubble, isMe && styles.bubbleMe]}>
+                          <Text style={[styles.bubbleText, isMe && styles.bubbleTextMe]}>{line.textJP}</Text>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              }
+            />
           </View>
 
           <View style={styles.playerCard}>
@@ -154,14 +161,10 @@ const styles = StyleSheet.create({
   regenText: { fontSize: 11, color: colors.textPrimary, fontWeight: '600' },
   regenTextDisabled: { color: colors.textSecondary },
   counterpart: { fontSize: 11, color: colors.textSecondary, marginTop: spacing.xs },
-  langTabs: { flexDirection: 'row', gap: spacing.xs, paddingHorizontal: spacing.lg, marginTop: spacing.md },
-  langTab: { paddingVertical: 4, paddingHorizontal: spacing.md, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border },
-  langTabSel: { backgroundColor: colors.navy, borderColor: colors.navy },
-  langTabText: { fontSize: 11, color: colors.textSecondary },
-  langTabTextSel: { color: colors.white },
   loadingWrap: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xl },
   loadingText: { fontSize: 12, color: colors.textSecondary },
-  lines: { paddingHorizontal: spacing.lg, marginTop: spacing.md, gap: spacing.sm },
+  lines: { paddingHorizontal: spacing.lg, marginTop: spacing.md },
+  linesInner: { gap: spacing.sm },
   lineRow: { alignItems: 'flex-start' },
   lineRowMe: { alignItems: 'flex-end' },
   bubble: { maxWidth: '85%', backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.sm },

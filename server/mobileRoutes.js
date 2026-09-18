@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
+const OpenAI = require('openai');
 const db = require('./db');
 
 const router = express.Router();
@@ -12,6 +13,8 @@ const JWT_SECRET = process.env.STUDENT_JWT_SECRET || 'teppen-english-student-dev
 const AVATAR_DIR = path.join(__dirname, 'public', 'avatars');
 fs.mkdirSync(AVATAR_DIR, { recursive: true });
 const avatarUpload = multer({ dest: '/tmp/teppen-uploads/' });
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const DEFAULT_OFFICIAL_FOLDERS = ['重要構文40', 'お役立ちフレーズ50'];
 
@@ -339,6 +342,55 @@ router.post('/weekly-mission', (req, res) => {
     );
   }
   res.json({ ok: true });
+});
+
+// ---- weekly progress（STEP1〜6を順番に完了しないと次に進めない。週が変わると0に戻る） ----
+router.get('/weekly-progress', (req, res) => {
+  const weekStart = mondayOfStr(new Date());
+  const row = db.prepare('SELECT completed_step FROM weekly_progress WHERE student_id = ? AND week_start = ?').get(req.studentId, weekStart);
+  res.json({ weekStart, completedStep: row ? row.completed_step : 0 });
+});
+
+router.post('/weekly-progress', (req, res) => {
+  const step = Number(req.body?.step);
+  if (!Number.isInteger(step) || step < 1 || step > 7) return res.status(400).json({ error: 'step must be 1-7' });
+  const weekStart = mondayOfStr(new Date());
+  const row = db.prepare('SELECT id, completed_step FROM weekly_progress WHERE student_id = ? AND week_start = ?').get(req.studentId, weekStart);
+  const current = row ? row.completed_step : 0;
+  if (step > current + 1) return res.status(400).json({ error: '前のステップを先に完了してください' });
+  const next = Math.max(current, step);
+  if (row) db.prepare('UPDATE weekly_progress SET completed_step = ? WHERE id = ?').run(next, row.id);
+  else db.prepare('INSERT INTO weekly_progress (student_id, week_start, completed_step) VALUES (?, ?, ?)').run(req.studentId, weekStart, next);
+  res.json({ ok: true, completedStep: next });
+});
+
+// ---- AI友達とのトーク（persona別のキャラ設定でLLMが返信する） ----
+const AI_PERSONAS = {
+  justin: 'You are Justin, a friendly, upbeat American friend chatting casually in English. Help the user practice everyday conversation. Keep replies short (1-3 sentences), natural, and end with a light question to keep the chat going. Never switch to Japanese unless the user is clearly stuck.',
+  bob: 'You are Bob, a relaxed, humorous American friend who loves small talk. Chat in casual English about daily life. Keep replies short (1-3 sentences) and ask follow-up questions.',
+  sara: 'You are Sara, a supportive English speaking coach-friend who helps the user practice presentations and speeches. Chat in English, keep replies short (1-3 sentences), and gently offer a better phrasing when the user makes a mistake.',
+  selen: 'あなたは「セレン」という、親しみやすい日本語の学習パートナーです。ユーザーの英語学習の悩み相談や雑談に、日本語で温かく短く（1〜3文）返信してください。',
+};
+
+router.post('/chat-ai', async (req, res) => {
+  const { persona, history = [] } = req.body || {};
+  const system = AI_PERSONAS[persona];
+  if (!system) return res.status(400).json({ error: 'unknown persona' });
+  const messages = history
+    .slice(-12)
+    .filter((m) => m && typeof m.text === 'string')
+    .map((m) => ({ role: m.from === 'me' ? 'user' : 'assistant', content: m.text.slice(0, 1000) }));
+  try {
+    const resp = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      max_tokens: 200,
+      messages: [{ role: 'system', content: system }, ...messages],
+    });
+    res.json({ reply: resp.choices[0].message.content || '' });
+  } catch (err) {
+    console.error('chat-ai error:', err);
+    res.status(500).json({ error: 'chat_ai_failed' });
+  }
 });
 
 // ---- mission history（記録画面の「スピーキング履歴」表示用にまとめて取得） ----

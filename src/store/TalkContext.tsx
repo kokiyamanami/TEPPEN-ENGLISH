@@ -87,23 +87,27 @@ export function TalkProvider({ children }: { children: ReactNode }) {
     }
 
     let kind: TalkThread['kind'] | undefined;
+    let history: TalkMessage[] = [];
     setThreads((prev) => {
       const thread = prev[key];
       if (!thread) return prev;
       kind = thread.kind;
       const updated: TalkThread = { ...thread, messages: [...thread.messages, { from: 'me', text, time: now }] };
+      history = updated.messages;
       return { ...prev, [key]: updated };
     });
 
     if (kind === 'ai') {
-      setTimeout(() => {
+      const appendReply = (reply: string) =>
         setThreads((prev) => {
           const thread = prev[key];
           if (!thread) return prev;
-          const reply = AI_REPLIES[Math.floor(Math.random() * AI_REPLIES.length)];
           return { ...prev, [key]: { ...thread, messages: [...thread.messages, { from: 'them', text: reply, time: now }] } };
         });
-      }, 900);
+      // 実際のAI返信。失敗時（オフライン等）は定型の返信にフォールバック
+      apiPost<{ reply: string }>('/chat-ai', { persona: key, history })
+        .then((res) => appendReply(res.reply || AI_REPLIES[0]))
+        .catch(() => appendReply(AI_REPLIES[Math.floor(Math.random() * AI_REPLIES.length)]));
     }
   };
 

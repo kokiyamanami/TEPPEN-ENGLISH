@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { generatePresentationRemote } from '../src/api/generation';
+import { LangSwipe } from '../src/components/LangSwipe';
 import { TopBar } from '../src/components/TopBar';
 import { TtsPlayerBar } from '../src/components/TtsPlayerBar';
 import { generatePresentation } from '../src/data/situational';
@@ -23,7 +24,6 @@ export default function PresentationMaterialScreen() {
   const [p, setP] = useState<Presentation>(() => generatePresentation(0));
   const [loading, setLoading] = useState(true);
   const [regenUsed, setRegenUsed] = useState(false);
-  const [langPage, setLangPage] = useState<0 | 1>(0);
   const [slashOn, setSlashOn] = useState(false);
 
   const load = useCallback(async () => {
@@ -78,15 +78,6 @@ export default function PresentationMaterialScreen() {
         <Switch value={slashOn} onValueChange={setSlashOn} trackColor={{ true: colors.coral }} />
       </View>
 
-      <View style={styles.langTabs}>
-        <Pressable style={[styles.langTab, langPage === 0 && styles.langTabSel]} onPress={() => setLangPage(0)}>
-          <Text style={[styles.langTabText, langPage === 0 && styles.langTabTextSel]}>EN</Text>
-        </Pressable>
-        <Pressable style={[styles.langTab, langPage === 1 && styles.langTabSel]} onPress={() => setLangPage(1)}>
-          <Text style={[styles.langTabText, langPage === 1 && styles.langTabTextSel]}>日本語</Text>
-        </Pressable>
-      </View>
-
       {loading ? (
         <View style={styles.loadingWrap}>
           <ActivityIndicator color={colors.coral} />
@@ -94,12 +85,27 @@ export default function PresentationMaterialScreen() {
         </View>
       ) : (
         <>
-          <View style={styles.paragraphCard}>
-            {(langPage === 0 ? enBlocks : p.paragraphsJP).map((t, i) => (
-              <Text key={i} style={styles.paragraphText}>
-                {t}
-              </Text>
-            ))}
+          <View style={styles.swipeWrap}>
+            <LangSwipe
+              en={
+                <View style={styles.paragraphCard}>
+                  {enBlocks.map((t, i) => (
+                    <Text key={i} style={styles.paragraphText}>
+                      {t}
+                    </Text>
+                  ))}
+                </View>
+              }
+              jp={
+                <View style={styles.paragraphCard}>
+                  {p.paragraphsJP.map((t, i) => (
+                    <Text key={i} style={styles.paragraphText}>
+                      {t}
+                    </Text>
+                  ))}
+                </View>
+              }
+            />
           </View>
 
           <View style={styles.playerCard}>
@@ -133,14 +139,10 @@ const styles = StyleSheet.create({
   topic: { fontSize: 11, color: colors.textSecondary, marginTop: spacing.xs },
   slashRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginHorizontal: spacing.lg, marginTop: spacing.md },
   slashLabel: { fontSize: 12, color: colors.textSecondary },
-  langTabs: { flexDirection: 'row', gap: spacing.xs, paddingHorizontal: spacing.lg, marginTop: spacing.sm },
-  langTab: { paddingVertical: 4, paddingHorizontal: spacing.md, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border },
-  langTabSel: { backgroundColor: colors.navy, borderColor: colors.navy },
-  langTabText: { fontSize: 11, color: colors.textSecondary },
-  langTabTextSel: { color: colors.white },
   loadingWrap: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xl },
   loadingText: { fontSize: 12, color: colors.textSecondary },
-  paragraphCard: { margin: spacing.lg, backgroundColor: colors.white, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: spacing.md, gap: spacing.sm },
+  swipeWrap: { marginHorizontal: spacing.lg, marginTop: spacing.md },
+  paragraphCard: { backgroundColor: colors.white, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: spacing.md, gap: spacing.sm },
   paragraphText: { fontSize: 12.5, color: colors.textPrimary, lineHeight: 19 },
   playerCard: { marginHorizontal: spacing.lg, marginBottom: spacing.md, backgroundColor: colors.white, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: spacing.md },
   phraseBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, alignSelf: 'center', marginBottom: spacing.md },
