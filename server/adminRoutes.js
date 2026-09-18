@@ -443,6 +443,7 @@ router.post('/phrase-decks', (req, res) => {
 router.patch('/phrase-decks/:id', (req, res) => {
   const d = parseDeck(req.body || {});
   if (d.error) return res.status(400).json({ error: d.error });
+  if (!db.prepare("SELECT id FROM phrase_decks WHERE id = ? AND kind = 'official'").get(req.params.id)) return res.status(404).json({ error: 'not_found' });
   db.prepare('UPDATE phrase_decks SET kind = ?, name = ?, level = ?, attr = ?, attr_value = ?, content_type = ? WHERE id = ?').run(d.kind, d.name, d.level, d.attr, d.attr_value, d.contentType, req.params.id);
   res.json({ ok: true });
 });
@@ -458,7 +459,12 @@ router.get('/phrase-decks/:id/items', (req, res) => {
 
 // 項目を丸ごと置き換える。同じ英文は既存の項目を引き継ぐ（生徒の「覚えた」状態を保つため）
 router.put('/phrase-decks/:id/items', (req, res) => {
+  if (!db.prepare("SELECT id FROM phrase_decks WHERE id = ? AND kind = 'official'").get(req.params.id)) return res.status(404).json({ error: 'not_found' });
   const items = Array.isArray(req.body?.items) ? req.body.items : [];
+  if (items.length > 2000) return res.status(400).json({ error: 'too many items (max 2000)' });
+  if (items.some((i) => String(i?.text || '').length > 1000 || String(i?.textJP || '').length > 1000)) {
+    return res.status(400).json({ error: 'text too long (max 1000 chars)' });
+  }
   const clean = items.map((i) => ({ text: String(i.text || '').trim(), textJP: String(i.textJP || '').trim() })).filter((i) => i.text);
   const existing = db.prepare('SELECT id, text FROM phrase_deck_items WHERE deck_id = ?').all(req.params.id);
   const byText = new Map(existing.map((e) => [e.text, e.id]));

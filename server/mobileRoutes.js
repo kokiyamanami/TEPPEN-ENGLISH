@@ -344,7 +344,7 @@ router.delete('/phrase-folders/:id', (req, res) => {
 });
 
 // 「AIで新しく作る」: プロフィールを元に、カスタマイズ教材へ新しいフレーズ・単語を追加する（既存は消さない）
-router.post('/phrase-generate', async (req, res) => {
+router.post('/phrase-generate', aiLimiter, async (req, res) => {
   if (isGenerating(req.studentId)) return res.status(202).json({ status: 'busy' });
   const started = generateCurated(req.studentId, { more: true });
   const early = await Promise.race([started, new Promise((r) => setTimeout(() => r('started'), 50))]);
@@ -370,8 +370,9 @@ router.post('/phrases/:id/learn', (req, res) => {
     )
     .get(req.params.id, req.studentId);
   if (!p) return res.status(404).json({ error: 'not_found' });
-  const today = isDate(req.body?.today) ? req.body.today : todayStr();
-  if (p.learned_on === today) return res.json({ learnedCount: p.learned_count, mastered: false, already: true });
+  // 1日1回の判定は端末の日付を信用せず、サーバーのJST日付で行う（端末の日付を任意に送れると同じ日に何度でも数えられる）
+  const today = todayStr();
+  if (p.learned_on && p.learned_on >= today) return res.json({ learnedCount: p.learned_count, mastered: false, already: true });
   const count = p.learned_count + 1;
   if (count < MASTER_COUNT) {
     db.prepare('UPDATE phrases SET learned_count = ?, learned = 1, learned_on = ? WHERE id = ?').run(count, today, p.id);

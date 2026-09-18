@@ -2,7 +2,8 @@ const Database = require('better-sqlite3');
 const bcrypt = require('bcryptjs');
 const path = require('path');
 
-const db = new Database(path.join(__dirname, 'admin.sqlite'));
+// テストでは DB_PATH に一時ファイルを指定して、本番用のDBを汚さない
+const db = new Database(process.env.DB_PATH || path.join(__dirname, 'admin.sqlite'));
 db.pragma('journal_mode = WAL');
 
 db.exec(`

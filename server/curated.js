@@ -84,7 +84,7 @@ function existingTexts(studentId, name) {
 // プロフィールから、その人専用のカスタマイズ教材をAIで作る（バックグラウンドで実行）。
 // 通常は、まだ無いフォルダだけを作る。more:true（生徒の「新しく作る」ボタン）のときは、全フォルダに新しいフレーズを追加する。
 // 既存のフレーズは消さない
-async function generateCurated(studentId, { more = false } = {}) {
+async function generateCuratedUnsafe(studentId, { more = false } = {}) {
   const st = state.get(studentId) || {};
   if (st.running) return 'busy';
   const row = readProfile(studentId);
@@ -102,10 +102,23 @@ async function generateCurated(studentId, { more = false } = {}) {
     state.set(studentId, { lastRunAt: more ? Date.now() : st.lastRunAt });
   } catch (err) {
     console.error('generateCurated failed:', err.message);
-    state.set(studentId, { failedAt: Date.now(), lastRunAt: st.lastRunAt });
+    // 失敗しても「新しく作る」の連打で毎回OpenAIを呼ばないよう、lastRunAtも更新してクールダウンさせる
+    state.set(studentId, { failedAt: Date.now(), lastRunAt: more ? Date.now() : st.lastRunAt });
     return 'failed';
   }
   return 'done';
+}
+
+// 呼び出し側は結果を待たずに実行することがあるため、DBエラーなどの例外は必ずここで受ける
+// （未捕捉のPromise rejectionはNode 15以降でプロセスを終了させる）
+async function generateCurated(studentId, options) {
+  try {
+    return await generateCuratedUnsafe(studentId, options);
+  } catch (err) {
+    console.error('generateCurated error:', err.message);
+    state.set(studentId, { failedAt: Date.now(), lastRunAt: state.get(studentId)?.lastRunAt });
+    return 'failed';
+  }
 }
 
 function isGenerating(studentId) {
