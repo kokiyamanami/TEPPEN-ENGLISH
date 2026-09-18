@@ -84,11 +84,23 @@ export function OnboardFieldInput({ field }: { field: OnboardField }) {
           onChangeText={(text) => setField(field.field, text as Profile[typeof field.field])}
         />
         {field.recommendMin && strValue.length < field.recommendMin ? (
-          <Text style={styles.nudge}>
-            {strValue.length === 0
-              ? 'ここは教材づくりの大切な材料です。ぜひ、思いつくことを書いてみてください。お願いします！'
-              : `あと${field.recommendMin - strValue.length}文字ほど、もう少し詳しく教えてください。書いてもらえるほど、あなたに合った教材が作れます。`}
-          </Text>
+          <View style={styles.nudgeBox}>
+            <Text style={styles.nudge}>
+              {strValue.length === 0
+                ? 'ここは教材づくりの大切な材料です。ぜひ書いてみてください。'
+                : `あと${field.recommendMin - strValue.length}文字ほど、もう少し詳しく教えてください。`}
+            </Text>
+            {field.hints?.length ? (
+              <>
+                <Text style={styles.nudgeTitle}>こんなことも教えてくれると嬉しいです</Text>
+                {field.hints.map((h) => (
+                  <Text key={h} style={styles.nudgeHint}>
+                    ・{h}
+                  </Text>
+                ))}
+              </>
+            ) : null}
+          </View>
         ) : null}
       </View>
     );
@@ -193,7 +205,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.textPrimary,
   },
-  nudge: { fontSize: 11, color: colors.coral, marginTop: 6, lineHeight: 16 },
+  nudgeBox: { marginTop: 6, backgroundColor: colors.background, borderRadius: 8, padding: 10, gap: 2 },
+  nudge: { fontSize: 11, color: colors.coral, lineHeight: 16, fontWeight: '600' },
+  nudgeTitle: { fontSize: 11, color: colors.textPrimary, fontWeight: '700', marginTop: 6 },
+  nudgeHint: { fontSize: 11, color: colors.textSecondary, lineHeight: 17 },
   textarea: { minHeight: 132, textAlignVertical: 'top' },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   chip: {
