@@ -72,7 +72,9 @@ export function WordLookupProvider({ children }: { children: ReactNode }) {
   const register = () => {
     const text = result?.word || word;
     close();
-    setTimeout(() => openRegister(text, false), 300);
+    // 表示中の意味（辞書の1つ目の意味、またはAIの意味）を和訳欄の初期値にする
+    const jp = result?.source === 'ai' ? result.meaning ?? '' : result?.senses?.[0] ?? '';
+    setTimeout(() => openRegister(text, false, null, jp), 300);
   };
 
   return (

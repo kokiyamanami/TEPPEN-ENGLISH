@@ -335,8 +335,18 @@ router.post('/phrases', (req, res) => {
 });
 
 router.patch('/phrases/:id', (req, res) => {
-  const { learned } = req.body || {};
-  db.prepare('UPDATE phrases SET learned = ? WHERE id = ? AND student_id = ?').run(learned ? 1 : 0, req.params.id, req.studentId);
+  const { learned, text, textJP, folderId } = req.body || {};
+  const has = (k) => Object.prototype.hasOwnProperty.call(req.body || {}, k);
+  const phrase = db.prepare('SELECT id FROM phrases WHERE id = ? AND student_id = ?').get(req.params.id, req.studentId);
+  if (!phrase) return res.status(404).json({ error: 'not_found' });
+  if (has('text') && !String(text || '').trim()) return res.status(400).json({ error: 'text_required' });
+  if (has('folderId') && !db.prepare('SELECT id FROM phrase_folders WHERE id = ? AND student_id = ?').get(folderId, req.studentId)) {
+    return res.status(404).json({ error: 'folder_not_found' });
+  }
+  if (has('learned')) db.prepare('UPDATE phrases SET learned = ? WHERE id = ?').run(learned ? 1 : 0, phrase.id);
+  if (has('text')) db.prepare('UPDATE phrases SET text = ? WHERE id = ?').run(String(text).trim(), phrase.id);
+  if (has('textJP')) db.prepare('UPDATE phrases SET text_jp = ? WHERE id = ?').run(String(textJP ?? '').trim(), phrase.id);
+  if (has('folderId')) db.prepare('UPDATE phrases SET folder_id = ? WHERE id = ?').run(folderId, phrase.id);
   res.json({ ok: true });
 });
 

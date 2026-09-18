@@ -9,6 +9,7 @@ export function PhraseRegisterModal() {
   const insets = useSafeAreaInsets();
   const { registerState, closeRegister, confirmRegister, folders, addFolder } = usePhrases();
   const [text, setText] = useState('');
+  const [textJP, setTextJP] = useState('');
   const [folderId, setFolderId] = useState<number | null>(null);
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
@@ -16,11 +17,12 @@ export function PhraseRegisterModal() {
   useEffect(() => {
     if (registerState.visible) {
       setText(registerState.text);
+      setTextJP(registerState.textJP);
       setFolderId(registerState.folderId);
       setShowNewFolder(false);
       setNewFolderName('');
     }
-  }, [registerState.visible, registerState.text, registerState.folderId]);
+  }, [registerState.visible, registerState.text, registerState.textJP, registerState.folderId]);
 
   const confirmNewFolder = async () => {
     if (!newFolderName.trim()) return;
@@ -34,7 +36,7 @@ export function PhraseRegisterModal() {
     <Modal visible={registerState.visible} transparent animationType="slide" onRequestClose={closeRegister}>
       <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={[styles.sheet, { paddingTop: insets.top + spacing.lg }]}>
-          <Text style={styles.title}>MYフレーズに登録</Text>
+          <Text style={styles.title}>{registerState.editId !== null ? 'フレーズを編集' : 'MYフレーズに登録'}</Text>
 
           {registerState.editable ? (
             <TextInput
@@ -42,7 +44,7 @@ export function PhraseRegisterModal() {
               multiline
               value={text}
               onChangeText={setText}
-              placeholder="気になった表現を入力・貼り付け"
+              placeholder="英語のフレーズを入力・貼り付け"
               placeholderTextColor={colors.textSecondary}
             />
           ) : (
@@ -50,6 +52,15 @@ export function PhraseRegisterModal() {
               <Text style={styles.textPreviewText}>{text}</Text>
             </View>
           )}
+
+          <TextInput
+            style={[styles.textArea, { minHeight: 44 }]}
+            multiline
+            value={textJP}
+            onChangeText={setTextJP}
+            placeholder="日本語訳（任意）"
+            placeholderTextColor={colors.textSecondary}
+          />
 
           <Text style={styles.label}>カテゴリを選ぶ</Text>
           <View style={styles.chipRow}>
@@ -89,9 +100,9 @@ export function PhraseRegisterModal() {
             </Pressable>
             <Pressable
               style={styles.confirmBtn}
-              onPress={() => folderId !== null && text.trim() && confirmRegister(text.trim(), folderId)}
+              onPress={() => folderId !== null && text.trim() && confirmRegister(text.trim(), folderId, textJP.trim())}
             >
-              <Text style={styles.confirmText}>登録する</Text>
+              <Text style={styles.confirmText}>{registerState.editId !== null ? '保存する' : '登録する'}</Text>
             </Pressable>
           </View>
         </View>
