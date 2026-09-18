@@ -76,7 +76,7 @@ export function OnboardFieldInput({ field }: { field: OnboardField }) {
         <TextInput
           style={[styles.box, styles.textarea]}
           multiline
-          numberOfLines={3}
+          numberOfLines={5}
           value={strValue}
           placeholder={field.placeholder}
           placeholderTextColor={colors.textSecondary}
@@ -186,7 +186,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.textPrimary,
   },
-  textarea: { minHeight: 72, textAlignVertical: 'top' },
+  textarea: { minHeight: 132, textAlignVertical: 'top' },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   chip: {
     borderWidth: 1,
