@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useProfile } from '../src/store/ProfileContext';
 import { colors, radius, spacing } from '../src/theme/colors';
 
@@ -12,14 +12,15 @@ export default function ObDoneScreen() {
   const finish = async () => {
     setSaving(true);
     try {
+      // 保存に失敗したままホームへ進むと、完了フラグが立たず（次回起動でオンボーディングに戻る）、
+      // AIの専用教材も作られないため、失敗時はここに留めて再試行してもらう
       await saveProfile();
       await completeOnboarding();
+      router.replace('/(tabs)/home');
     } catch (e) {
-      // 保存に失敗してもオンボーディングは継続させる（次回プロフィール編集画面で再保存可能）
-      console.warn('saveProfile failed at obdone:', e);
+      Alert.alert('保存に失敗しました', '通信状況を確認して、もう一度お試しください。');
     } finally {
       setSaving(false);
-      router.replace('/(tabs)/home');
     }
   };
 

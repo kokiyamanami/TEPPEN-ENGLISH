@@ -38,7 +38,7 @@ export const emptyProfile: Profile = {
   termGoal: '',
 };
 
-type MeResponse = { profile: Partial<Profile>; onboardingStep: string; onboardingComplete: boolean; avatarUrl: string };
+type MeResponse = { profile: Partial<Profile>; onboardingStep: string; onboardingComplete: boolean; avatarUrl: string; phase?: number };
 
 const ARRAY_FIELDS: (keyof Profile)[] = ['job', 'position', 'hobby'];
 
@@ -57,6 +57,7 @@ function normalizeProfile(partial: Partial<Profile>): Partial<Profile> {
 type ProfileContextValue = {
   profile: Profile;
   avatarUrl: string;
+  phase: number;
   setField: <K extends keyof Profile>(field: K, value: Profile[K]) => void;
   loadProfile: () => Promise<{ onboardingStep: string; onboardingComplete: boolean }>;
   saveProfile: () => Promise<void>;
@@ -71,12 +72,14 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useSession();
   const [profile, setProfile] = useState<Profile>(emptyProfile);
   const [avatarUrl, setAvatarUrl] = useState('');
+  const [phase, setPhase] = useState(1);
 
   // ログアウト時は前のアカウントのプロフィールが残らないようクリアする
   useEffect(() => {
     if (!isAuthenticated) {
       setProfile(emptyProfile);
       setAvatarUrl('');
+      setPhase(1);
     }
   }, [isAuthenticated]);
 
@@ -90,6 +93,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     const res = await apiGet<MeResponse>('/me');
     setProfile({ ...emptyProfile, ...normalizeProfile(res.profile) });
     setAvatarUrl(res.avatarUrl || '');
+    setPhase(res.phase ?? 1);
     return { onboardingStep: res.onboardingStep, onboardingComplete: res.onboardingComplete };
   };
 
@@ -114,7 +118,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
 
   return (
     <ProfileContext.Provider
-      value={{ profile, avatarUrl, setField, loadProfile, saveProfile, saveOnboardingProgress, completeOnboarding, uploadAvatar }}
+      value={{ profile, avatarUrl, phase, setField, loadProfile, saveProfile, saveOnboardingProgress, completeOnboarding, uploadAvatar }}
     >
       {children}
     </ProfileContext.Provider>

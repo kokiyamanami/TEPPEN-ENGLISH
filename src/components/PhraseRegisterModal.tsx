@@ -28,10 +28,14 @@ export function PhraseRegisterModal() {
 
   const confirmNewFolder = async () => {
     if (!newFolderName.trim()) return;
-    const id = await addFolder(newFolderName.trim(), type);
-    setFolderId(id);
-    setShowNewFolder(false);
-    setNewFolderName('');
+    try {
+      const id = await addFolder(newFolderName.trim(), type);
+      setFolderId(id);
+      setShowNewFolder(false);
+      setNewFolderName('');
+    } catch {
+      Alert.alert('フォルダを作成できませんでした', '通信状況を確認して、もう一度お試しください。');
+    }
   };
 
   return (

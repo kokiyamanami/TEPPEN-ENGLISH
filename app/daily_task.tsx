@@ -28,7 +28,8 @@ export default function DailyTaskScreen() {
     if (!record.uri) return;
     setGrading(true);
     try {
-      const res = await submitForGrading(record.uri, mission.label, mission.prompt, mission.promptJP, `daily:${missionType}`);
+      // フリー練習から来た場合はDailyミッションの記録に含めない
+      const res = await submitForGrading(record.uri, mission.label, mission.prompt, mission.promptJP, origin === 'freetraining' ? undefined : `daily:${missionType}`);
       setResult(res);
     } catch (e) {
       Alert.alert('添削に失敗しました', 'サーバーに接続できませんでした。もう一度お試しください。');

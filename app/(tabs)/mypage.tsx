@@ -27,7 +27,7 @@ const FIELD_ROWS: { key: keyof ReturnType<typeof useProfile>['profile']; label: 
 
 // screen key: mypage
 export default function MyPageScreen() {
-  const { profile, avatarUrl, loadProfile } = useProfile();
+  const { profile, avatarUrl, phase, loadProfile } = useProfile();
   const { logout } = useSession();
   const [logoutOpen, setLogoutOpen] = useState(false);
   const { totalStudyMinutes } = useStats();
@@ -52,7 +52,7 @@ export default function MyPageScreen() {
           </View>
         )}
         <Text style={styles.heroName}>{profile.name || '名前未設定'}</Text>
-        <Text style={styles.heroPhase}>PHASE 3 · 標高{altitudeM.toLocaleString()}M</Text>
+        <Text style={styles.heroPhase}>PHASE {phase} · 標高{altitudeM.toLocaleString()}M</Text>
       </View>
 
       <View style={styles.sectionHeader}>

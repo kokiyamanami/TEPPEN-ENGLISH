@@ -1,4 +1,5 @@
 import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react';
+import { Alert } from 'react-native';
 import { apiDelete, apiGet, apiPatch, apiPost } from '../api/mobileAuth';
 import { dateKey } from '../utils/dateHelpers';
 import { useSession } from './SessionContext';
@@ -125,7 +126,8 @@ export function PhraseProvider({ children }: { children: ReactNode }) {
         setPhrases((prev) => [...prev, { id: res.id, folder_id: folderId, text, text_jp: textJP, learned: 0, learned_count: 0, learned_on: null }]);
       }
     } catch {
-      // 登録に失敗した場合は一覧を変更しない（未捕捉のPromise rejectionを避ける）
+      // 一覧は変更せず、シートは閉じているため、失敗したことをユーザーに伝える
+      Alert.alert('保存できませんでした', '通信状況を確認して、もう一度お試しください。');
     }
   };
 

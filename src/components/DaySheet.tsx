@@ -54,13 +54,18 @@ export function DaySheet({ visible, date, entries, onChangeDate, onCancel, onSav
   };
 
   const save = async () => {
+    const minutes = Math.round(Number(form.minutes));
+    if (!Number.isFinite(minutes) || minutes < 1 || minutes > 1440) {
+      Alert.alert('学習時間を確認してください', '1〜1440分の範囲で入力してください。');
+      return;
+    }
     setSaving(true);
     try {
       await onSave({
         id: editingId ?? undefined,
         category: form.category,
         subcategories: form.subs.length ? form.subs : [STUDY_SUBCATEGORIES[0]],
-        minutes: Number(form.minutes) || 0,
+        minutes,
         memo: form.memo,
       });
       startNew();
