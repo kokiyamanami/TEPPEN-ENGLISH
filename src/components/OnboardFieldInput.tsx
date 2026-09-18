@@ -78,6 +78,8 @@ export function OnboardFieldInput({ field }: { field: OnboardField }) {
           multiline
           numberOfLines={3}
           value={strValue}
+          placeholder={field.placeholder}
+          placeholderTextColor={colors.textSecondary}
           maxLength={field.maxLength}
           onChangeText={(text) => setField(field.field, text as Profile[typeof field.field])}
         />
@@ -91,6 +93,8 @@ export function OnboardFieldInput({ field }: { field: OnboardField }) {
       <TextInput
         style={styles.box}
         value={value as string}
+        placeholder={field.placeholder}
+        placeholderTextColor={colors.textSecondary}
         maxLength={field.maxLength}
         onChangeText={(text) => setField(field.field, text as Profile[typeof field.field])}
       />
@@ -154,7 +158,7 @@ function MultiSelectField({ field }: { field: OnboardField }) {
       <View style={styles.addRow}>
         <TextInput
           style={[styles.box, styles.addInput]}
-          placeholder="その他（自由入力）を追加"
+          placeholder={field.placeholder ?? 'その他（自由入力）を追加'}
           placeholderTextColor={colors.textSecondary}
           value={draft}
           onChangeText={setDraft}

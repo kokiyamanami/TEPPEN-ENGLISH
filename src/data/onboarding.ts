@@ -10,6 +10,7 @@ export type OnboardField = {
   min?: number;
   max?: number;
   maxLength?: number;
+  placeholder?: string; // 入力例（薄く表示）
   single?: boolean; // type:'multi'で、実質1つしか選べないようにする場合true（例: 職位）
 };
 
@@ -33,7 +34,7 @@ export const onboardSteps: OnboardStep[] = [
     title: 'まずはあなたについて',
     sub: 'プロフィールはAIが教材を作る土台になります。後からいつでも編集できます。',
     fields: [
-      { type: 'text', field: 'name', label: 'お名前' },
+      { type: 'text', field: 'name', label: 'お名前', placeholder: '例）山田 太郎' },
       { type: 'chips', field: 'gender', label: '性別', options: ['男性', '女性', '回答しない'] },
       { type: 'slider', field: 'age', label: '年齢', min: 18, max: 70 },
       { type: 'chips', field: 'voiceGender', label: '読み上げ音声の性別', options: ['男性', '女性'] },
@@ -44,9 +45,9 @@ export const onboardSteps: OnboardStep[] = [
     title: 'お仕事について',
     sub: '業種・役職に合わせたビジネスシーン教材を自動生成します。選択肢になければ自由入力もできます（複数選択可）。',
     fields: [
-      { type: 'multi', field: 'job', label: '職業', options: JOB_OPTIONS },
+      { type: 'multi', field: 'job', label: '職業', options: JOB_OPTIONS, placeholder: '例）法務、物流（選択肢にない場合）' },
       { type: 'multi', field: 'position', label: '職位', options: POSITION_OPTIONS, single: true },
-      { type: 'textarea', field: 'jobDetail', label: '職業詳細', maxLength: FREE_TEXT_MAX },
+      { type: 'textarea', field: 'jobDetail', label: '職業詳細', placeholder: '例）BtoB SaaSの法人営業として、製造業のお客様を10社担当しています。海外拠点とのやり取りも増えています。', maxLength: FREE_TEXT_MAX },
     ],
   },
   {
@@ -54,9 +55,9 @@ export const onboardSteps: OnboardStep[] = [
     title: 'あなたの人物像',
     sub: '性格や経歴を伝えるほど、自然な会話設問が作れます。',
     fields: [
-      { type: 'textarea', field: 'personality', label: '性格', maxLength: FREE_TEXT_MAX },
-      { type: 'multi', field: 'hobby', label: '趣味', options: HOBBY_OPTIONS },
-      { type: 'textarea', field: 'career', label: '経歴', maxLength: FREE_TEXT_MAX },
+      { type: 'textarea', field: 'personality', label: '性格', placeholder: '例）慎重で聞き役になることが多いですが、慣れると冗談も言うタイプです。', maxLength: FREE_TEXT_MAX },
+      { type: 'multi', field: 'hobby', label: '趣味', options: HOBBY_OPTIONS, placeholder: '例）釣り、サウナ（選択肢にない場合）' },
+      { type: 'textarea', field: 'career', label: '経歴', placeholder: '例）新卒で商社に入社し、5年間海外営業を担当。2022年に現職へ転職しました。', maxLength: FREE_TEXT_MAX },
     ],
   },
   {
@@ -64,8 +65,8 @@ export const onboardSteps: OnboardStep[] = [
     title: '強み・実績',
     sub: '成功体験は、自信を持って話せる教材のネタになります。',
     fields: [
-      { type: 'textarea', field: 'successStory', label: '成功体験', maxLength: FREE_TEXT_MAX },
-      { type: 'textarea', field: 'strengths', label: '強み・弱み', maxLength: FREE_TEXT_MAX },
+      { type: 'textarea', field: 'successStory', label: '成功体験', placeholder: '例）新規開拓で年間目標の120%を達成し、社内の表彰を受けました。', maxLength: FREE_TEXT_MAX },
+      { type: 'textarea', field: 'strengths', label: '強み・弱み', placeholder: '例）強み: 相手の課題を引き出す質問力。弱み: 急な場面で英語が出てこないこと。', maxLength: FREE_TEXT_MAX },
     ],
   },
   {
@@ -73,8 +74,8 @@ export const onboardSteps: OnboardStep[] = [
     title: 'キャリアと今の課題',
     sub: '将来像や課題感を伝えるほど、教材の質が上がります。',
     fields: [
-      { type: 'textarea', field: 'futureCareer', label: 'キャリア（将来像）', maxLength: FREE_TEXT_MAX },
-      { type: 'textarea', field: 'workChallenge', label: '仕事課題', maxLength: FREE_TEXT_MAX },
+      { type: 'textarea', field: 'futureCareer', label: 'キャリア（将来像）', placeholder: '例）3年後に海外拠点のマネージャーとして、現地チームを率いたいです。', maxLength: FREE_TEXT_MAX },
+      { type: 'textarea', field: 'workChallenge', label: '仕事課題', placeholder: '例）英語での会議で議論についていけず、発言のタイミングを逃してしまいます。', maxLength: FREE_TEXT_MAX },
     ],
   },
 ];
