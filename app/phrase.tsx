@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { TopBar } from '../src/components/TopBar';
 import { PhraseFolderSource, usePhrases } from '../src/store/PhraseContext';
@@ -8,7 +8,7 @@ import { colors, radius, spacing } from '../src/theme/colors';
 import { useTopInset } from '../src/hooks/useTopInset';
 
 const SECTIONS: { source: PhraseFolderSource; title: string; desc: string; empty: string }[] = [
-  { source: 'curated', title: 'カスタマイズ教材', desc: 'あなたの職業・趣味・性格・経歴に合わせて、運営が選んだ単語です', empty: 'プロフィールに合わせた教材が用意され次第、ここに表示されます' },
+  { source: 'curated', title: 'カスタマイズ教材', desc: 'あなたの職業・趣味・性格・経歴に合わせて、AIが作った専用のフレーズです', empty: 'あなたのプロフィールからAIが専用の教材を作成中です。1分ほどで表示されます' },
   { source: 'official', title: '運営提供', desc: 'あなたの英語レベルに合わせた、覚えてほしい単語・フレーズです', empty: 'あなたのレベルの教材が用意され次第、ここに表示されます' },
   { source: 'custom', title: 'マイフォルダ', desc: '自由に追加・編集・削除できる、あなた専用のフォルダです', empty: '' },
 ];
@@ -16,7 +16,19 @@ const SECTIONS: { source: PhraseFolderSource; title: string; desc: string; empty
 // screen key: phrase
 export default function PhraseScreen() {
   const topInset = useTopInset();
-  const { folders, folderCount, addFolder, deleteFolder, renameFolder, openRegister } = usePhrases();
+  const { folders, reload, folderCount, addFolder, deleteFolder, renameFolder, openRegister } = usePhrases();
+  // カスタマイズ教材はプロフィールからAIが作るため、できるまで数秒〜1分ほどかかる。できるまで定期的に取得し直す
+  const hasCurated = folders.some((f) => f.source === 'curated');
+  useEffect(() => {
+    if (hasCurated) return;
+    let tries = 0;
+    const timer = setInterval(() => {
+      if (++tries > 15) return clearInterval(timer);
+      reload().catch(() => {});
+    }, 4000);
+    reload().catch(() => {});
+    return () => clearInterval(timer);
+  }, [hasCurated]); // eslint-disable-line react-hooks/exhaustive-deps
   const [renameTarget, setRenameTarget] = useState<{ id: number; name: string } | null>(null);
   const [showAddFolder, setShowAddFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');

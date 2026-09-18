@@ -408,21 +408,13 @@ router.patch('/materials/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-// ---- phrase decks（MYフレーズの運営提供・カスタマイズ教材） ----
-const DECK_ATTRS = ['job', 'hobby', 'personality', 'career'];
-
+// ---- phrase decks（MYフレーズの運営提供教材。カスタマイズ教材はプロフィールからAIが自動生成する） ----
 function parseDeck(body) {
-  const kind = body.kind;
   const name = String(body.name || '').trim();
-  if (!['official', 'curated'].includes(kind) || !name) return { error: 'kind and name are required' };
-  if (kind === 'official') {
-    const level = Number(body.level);
-    if (!Number.isInteger(level) || level < 1 || level > 5) return { error: 'level must be 1-5' };
-    return { kind, name, level, attr: null, attr_value: null };
-  }
-  const value = String(body.attrValue || '').trim();
-  if (!DECK_ATTRS.includes(body.attr) || !value) return { error: 'attr and attrValue are required' };
-  return { kind, name, level: null, attr: body.attr, attr_value: value };
+  const level = Number(body.level);
+  if (!name) return { error: 'name is required' };
+  if (!Number.isInteger(level) || level < 1 || level > 5) return { error: 'level must be 1-5' };
+  return { kind: 'official', name, level, attr: null, attr_value: null };
 }
 
 router.get('/phrase-decks', (req, res) => {
@@ -431,7 +423,7 @@ router.get('/phrase-decks', (req, res) => {
       .prepare(
         `SELECT d.*, (SELECT COUNT(*) FROM phrase_deck_items i WHERE i.deck_id = d.id) as item_count,
                 (SELECT COUNT(*) FROM phrase_folders f WHERE f.deck_id = d.id) as student_count
-         FROM phrase_decks d ORDER BY d.kind DESC, d.level, d.id`
+         FROM phrase_decks d WHERE d.kind = 'official' ORDER BY d.level, d.id`
       )
       .all()
   );

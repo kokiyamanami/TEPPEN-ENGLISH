@@ -1,34 +1,16 @@
 const db = require('./db');
 
-// プロフィールの職業・趣味（複数選択）／性格・経歴（自由記述）が、教材の条件に当てはまるか
-function matchesProfile(deck, profile) {
-  const v = String(deck.attr_value || '').trim();
-  if (!v || !deck.attr) return false;
-  const list = (x) => (Array.isArray(x) ? x : x ? [String(x)] : []);
-  if (deck.attr === 'job') return list(profile.job).includes(v) || String(profile.jobDetail || '').includes(v);
-  if (deck.attr === 'hobby') return list(profile.hobby).includes(v);
-  if (deck.attr === 'personality') return String(profile.personality || '').includes(v);
-  if (deck.attr === 'career') return String(profile.career || '').includes(v);
-  return false;
-}
-
 // 生徒の教材フォルダを運営の教材に同期する。
-// 該当する教材のフォルダとフレーズを作り、教材側の追加・変更・削除を反映する（覚えた状態は保持）。
-// 一度配布した教材は、プロフィールやレベルが変わっても残す
+// 運営提供（レベル別）の教材を、生徒のレベルに合わせて配布し、教材側の追加・変更・削除を反映する（覚えた状態は保持）。
+// 一度配布した教材は、レベルが変わっても残す。カスタマイズ教材はプロフィールからAIが生成する（curated.js）
 function syncDecks(studentId) {
-  const student = db.prepare('SELECT phase, profile_json, onboarding_complete FROM students WHERE id = ?').get(studentId);
+  const student = db.prepare('SELECT phase, onboarding_complete FROM students WHERE id = ?').get(studentId);
   // プロフィールが入力されるオンボーディング完了後に配布する
   if (!student || !student.onboarding_complete) return;
-  let profile = {};
-  try {
-    profile = JSON.parse(student.profile_json || '{}');
-  } catch {
-    profile = {};
-  }
-  const decks = db.prepare('SELECT * FROM phrase_decks ORDER BY id').all();
+  const decks = db.prepare("SELECT * FROM phrase_decks WHERE kind = 'official' ORDER BY id").all();
   const tx = db.transaction(() => {
     decks.forEach((deck) => {
-      const applicable = deck.kind === 'official' ? deck.level === student.phase : matchesProfile(deck, profile);
+      const applicable = deck.level === student.phase;
       let folder = db.prepare('SELECT id, name, source FROM phrase_folders WHERE student_id = ? AND deck_id = ?').get(studentId, deck.id);
       if (!folder) {
         if (!applicable) return;

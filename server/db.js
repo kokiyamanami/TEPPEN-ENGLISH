@@ -223,6 +223,9 @@ if (!studentCols.includes('onboarding_complete')) {
 if (!studentCols.includes('avatar_url')) {
   db.exec('ALTER TABLE students ADD COLUMN avatar_url TEXT');
 }
+if (!studentCols.includes('curated_hash')) {
+  db.exec('ALTER TABLE students ADD COLUMN curated_hash TEXT');
+}
 const phraseFolderCols = db.prepare('PRAGMA table_info(phrase_folders)').all().map((c) => c.name);
 if (!phraseFolderCols.includes('deck_id')) {
   db.exec('ALTER TABLE phrase_folders ADD COLUMN deck_id INTEGER REFERENCES phrase_decks(id)');

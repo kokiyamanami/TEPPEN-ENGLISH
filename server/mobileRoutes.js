@@ -6,9 +6,13 @@ const fs = require('fs');
 const path = require('path');
 const OpenAI = require('openai');
 const db = require('./db');
-const { todayStr, mondayOfStr } = require('./dateUtil');
+const { todayStr, mondayOfStr, clientToday } = require('./dateUtil');
+const { createRateLimiter } = require('./rateLimit');
+
+const aiLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 30 });
 const { lookupDictionary } = require('./dictionary');
 const { syncDecks } = require('./phraseDecks');
+const { generateCurated } = require('./curated');
 const { REST_LIMIT_PER_MONTH, goalHistory, restDays, currentGoal } = require('./goals');
 
 const router = express.Router();
@@ -146,6 +150,8 @@ router.post('/onboarding-progress', (req, res) => {
 
 router.post('/onboarding-complete', (req, res) => {
   db.prepare("UPDATE students SET onboarding_complete = 1, onboarding_step = 'obdone' WHERE id = ?").run(req.studentId);
+  syncDecks(req.studentId);
+  generateCurated(req.studentId, { force: true });
   res.json({ ok: true });
 });
 
@@ -161,6 +167,9 @@ router.patch('/profile', (req, res) => {
     updated.name || student.name || '',
     req.studentId
   );
+  // プロフィールの職業・趣味などが変わったら、該当するカスタマイズ教材を配布する
+  syncDecks(req.studentId);
+  generateCurated(req.studentId);
   res.json({ ok: true });
 });
 
@@ -183,7 +192,7 @@ router.get('/ad-banners', (req, res) => {
 router.get('/study-summary', (req, res) => {
   const row = db.prepare('SELECT COALESCE(SUM(study_min), 0) as total FROM speaking_stats WHERE student_id = ?').get(req.studentId);
   // 「今日」は端末のローカル日付で判定する（サーバーはUTCのため日本時間の午前0〜9時にずれる）
-  const today = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.today)) ? String(req.query.today) : todayStr();
+  const today = clientToday(req.query.today);
   const t = db
     .prepare('SELECT COALESCE(SUM(study_min), 0) as study, COALESCE(SUM(speak_min), 0) as speak FROM speaking_stats WHERE student_id = ? AND date = ?')
     .get(req.studentId, today);
@@ -208,7 +217,7 @@ router.get('/goals', (req, res) => res.json(goalsPayload(req.studentId)));
 
 router.put('/goals', (req, res) => {
   const { studyGoal, speakGoal } = req.body || {};
-  const today = isDate(req.body?.today) ? req.body.today : todayStr();
+  const today = clientToday(req.body?.today);
   const ok = (v) => Number.isInteger(v) && v >= 1 && v <= 1440;
   if (!ok(studyGoal) || !ok(speakGoal)) return res.status(400).json({ error: 'invalid_goal' });
   const existing = db.prepare('SELECT id FROM goal_history WHERE student_id = ? AND effective_from = ?').get(req.studentId, today);
@@ -220,7 +229,7 @@ router.put('/goals', (req, res) => {
 // お休みは、2日前〜未来の日に月4回まで設定できる（後出しで連続記録を守るのを防ぐ）
 router.post('/rest-days', (req, res) => {
   const { date } = req.body || {};
-  const today = isDate(req.body?.today) ? req.body.today : todayStr();
+  const today = clientToday(req.body?.today);
   if (!isDate(date)) return res.status(400).json({ error: 'invalid_date' });
   if (date < dayShift(today, -2)) return res.status(400).json({ error: 'too_old' });
   const month = date.slice(0, 7);
@@ -232,7 +241,7 @@ router.post('/rest-days', (req, res) => {
 });
 
 router.delete('/rest-days/:date', (req, res) => {
-  const today = isDate(req.query.today) ? String(req.query.today) : todayStr();
+  const today = clientToday(req.query.today);
   if (!isDate(req.params.date)) return res.status(400).json({ error: 'invalid_date' });
   if (req.params.date < today) return res.status(400).json({ error: 'past_locked' });
   db.prepare('DELETE FROM rest_days WHERE student_id = ? AND date = ?').run(req.studentId, req.params.date);
@@ -303,12 +312,13 @@ router.delete('/records/:id', (req, res) => {
 // ---- phrases / folders ----
 router.get('/phrase-folders', (req, res) => {
   syncDecks(req.studentId);
+  generateCurated(req.studentId); // 未生成なら作る（作成済みでプロフィール未変更なら何もしない）
   res.json(db.prepare('SELECT * FROM phrase_folders WHERE student_id = ? ORDER BY id').all(req.studentId));
 });
 
 router.post('/phrase-folders', (req, res) => {
   const { name } = req.body || {};
-  if (!name || typeof name !== 'string') return res.status(400).json({ error: 'name is required' });
+  if (!name || typeof name !== 'string' || name.length > 100) return res.status(400).json({ error: 'name is required (max 100 chars)' });
   const info = db.prepare("INSERT INTO phrase_folders (student_id, name, source) VALUES (?, ?, 'custom')").run(req.studentId, name);
   res.json({ id: info.lastInsertRowid });
 });
@@ -338,6 +348,9 @@ router.get('/phrases', (req, res) => {
 router.post('/phrases', (req, res) => {
   const { folderId, text, textJP = '' } = req.body || {};
   if (!folderId || !text) return res.status(400).json({ error: 'folderId and text are required' });
+  if (typeof text !== 'string' || text.length > 1000 || typeof textJP !== 'string' || textJP.length > 1000) {
+    return res.status(400).json({ error: 'text and textJP must be strings (max 1000 chars)' });
+  }
   const folder = db.prepare("SELECT id FROM phrase_folders WHERE id = ? AND student_id = ? AND source = 'custom'").get(folderId, req.studentId);
   if (!folder) return res.status(404).json({ error: 'folder_not_found' });
   const info = db
@@ -356,6 +369,9 @@ router.patch('/phrases/:id', (req, res) => {
   // 運営提供・カスタマイズ教材の中身は変更できない（覚えた状態のみ切り替え可）
   if (phrase.source !== 'custom' && (has('text') || has('textJP') || has('folderId'))) return res.status(403).json({ error: 'read_only' });
   if (has('text') && !String(text || '').trim()) return res.status(400).json({ error: 'text_required' });
+  if ((has('text') && String(text).length > 1000) || (has('textJP') && String(textJP ?? '').length > 1000)) {
+    return res.status(400).json({ error: 'text too long (max 1000 chars)' });
+  }
   if (has('folderId') && !db.prepare("SELECT id FROM phrase_folders WHERE id = ? AND student_id = ? AND source = 'custom'").get(folderId, req.studentId)) {
     return res.status(404).json({ error: 'folder_not_found' });
   }
@@ -404,7 +420,7 @@ const AI_PERSONAS = {
   selen: 'あなたは「セレン」という、親しみやすい日本語の学習パートナーです。ユーザーの英語学習の悩み相談や雑談に、日本語で温かく短く（1〜3文）返信してください。',
 };
 
-router.post('/chat-ai', async (req, res) => {
+router.post('/chat-ai', aiLimiter, async (req, res) => {
   const { persona } = req.body || {};
   const history = Array.isArray(req.body?.history) ? req.body.history : [];
   const system = Object.prototype.hasOwnProperty.call(AI_PERSONAS, persona) ? AI_PERSONAS[persona] : null;
@@ -443,6 +459,13 @@ router.post('/word-lookup', async (req, res) => {
 
   const cacheKey = `${word.toLowerCase()}::${sentence}`;
   if (wordLookupCache.has(cacheKey)) return res.json(wordLookupCache.get(cacheKey));
+
+  // 辞書の検索とキャッシュ命中は無料なので制限しない。OpenAIを呼ぶ場合だけレート制限をかける
+  let allowed = false;
+  aiLimiter(req, res, () => {
+    allowed = true;
+  });
+  if (!allowed) return;
 
   try {
     const resp = await openai.chat.completions.create({
@@ -498,7 +521,7 @@ router.get('/chat', (req, res) => {
 
 router.post('/chat', (req, res) => {
   const { text } = req.body || {};
-  if (!text) return res.status(400).json({ error: 'text is required' });
+  if (!text || typeof text !== 'string' || text.length > 2000) return res.status(400).json({ error: 'text is required (max 2000 chars)' });
   const info = db
     .prepare('INSERT INTO chat_messages (student_id, sender, text, time) VALUES (?, ?, ?, ?)')
     .run(req.studentId, 'student', text, new Date().toISOString());

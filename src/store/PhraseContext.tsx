@@ -12,6 +12,7 @@ type RegisterState = { visible: boolean; text: string; textJP: string; editable:
 type PhraseContextValue = {
   folders: PhraseFolder[];
   phrases: Phrase[];
+  reload: () => Promise<void>;
   folderCount: (folderId: number) => number;
   addFolder: (name: string) => Promise<number>;
   deleteFolder: (id: number) => void;
@@ -114,7 +115,7 @@ export function PhraseProvider({ children }: { children: ReactNode }) {
   };
 
   const value = useMemo(
-    () => ({ folders, phrases, folderCount, addFolder, deleteFolder, renameFolder, deletePhrase, toggleLearned, registerState, openRegister, openEdit, closeRegister, confirmRegister }),
+    () => ({ folders, phrases, reload: load, folderCount, addFolder, deleteFolder, renameFolder, deletePhrase, toggleLearned, registerState, openRegister, openEdit, closeRegister, confirmRegister }),
     [folders, phrases, registerState]
   );
 
