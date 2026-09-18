@@ -7,11 +7,14 @@ const path = require('path');
 const db = require('./db');
 
 const router = express.Router();
+if (!process.env.ADMIN_JWT_SECRET && process.env.NODE_ENV === 'production') {
+  throw new Error('ADMIN_JWT_SECRET must be set in production');
+}
 const JWT_SECRET = process.env.ADMIN_JWT_SECRET || 'teppen-english-dev-secret';
 
 const AD_IMAGE_DIR = path.join(__dirname, 'public', 'ads');
 fs.mkdirSync(AD_IMAGE_DIR, { recursive: true });
-const adImageUpload = multer({ dest: '/tmp/teppen-uploads/' });
+const adImageUpload = multer({ dest: '/tmp/teppen-uploads/', limits: { fileSize: 10 * 1024 * 1024 } });
 
 function requireAuth(req, res, next) {
   const header = req.headers.authorization || '';
@@ -149,7 +152,7 @@ router.patch('/students/:id', (req, res) => {
     `UPDATE students SET
       status = COALESCE(?, status), name = COALESCE(?, name), email = COALESCE(?, email), phone = COALESCE(?, phone)
      WHERE id = ?`
-  ).run(status ?? null, name ?? null, email ?? null, phone ?? null, req.params.id);
+  ).run(status ?? null, name ?? null, typeof email === 'string' ? email.trim() || null : null, phone ?? null, req.params.id);
   // groupIdはグループ解除（null）を明示的に送るケースがあるため、COALESCEではなく
   // リクエストにフィールドが含まれているかどうかで判定する
   if (Object.prototype.hasOwnProperty.call(body, 'groupId')) {
@@ -514,13 +517,14 @@ router.post('/ads/upload', adImageUpload.single('image'), (req, res) => {
   } catch (err) {
     console.error('ad image upload error:', err);
     fs.unlink(file.path, () => {});
-    res.status(500).json({ error: 'upload_failed', detail: String(err.message || err) });
+    res.status(500).json({ error: 'upload_failed' });
   }
 });
 
 router.post('/ads', (req, res) => {
   const { imageUrl, linkUrl = '', placement = 'home', enabled = true, sortOrder = 0 } = req.body || {};
   if (!imageUrl) return res.status(400).json({ error: 'imageUrl is required' });
+  if (linkUrl && !/^https?:\/\//i.test(linkUrl)) return res.status(400).json({ error: 'linkUrl must be http(s)' });
   const info = db
     .prepare('INSERT INTO ad_banners (image_url, link_url, placement, enabled, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?)')
     .run(imageUrl, linkUrl, placement, enabled ? 1 : 0, sortOrder, new Date().toISOString().slice(0, 10));
@@ -529,6 +533,7 @@ router.post('/ads', (req, res) => {
 
 router.patch('/ads/:id', (req, res) => {
   const { imageUrl, linkUrl, placement, enabled, sortOrder } = req.body || {};
+  if (linkUrl && !/^https?:\/\//i.test(linkUrl)) return res.status(400).json({ error: 'linkUrl must be http(s)' });
   db.prepare(
     `UPDATE ad_banners SET
       image_url = COALESCE(?, image_url), link_url = COALESCE(?, link_url), placement = COALESCE(?, placement),

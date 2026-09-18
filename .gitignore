@@ -43,3 +43,5 @@ server/public/
 # generated native folders
 /ios
 /android
+
+server/dictionary.sqlite*

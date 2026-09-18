@@ -56,6 +56,12 @@ export async function authedFetch(path: string, options: RequestInit = {}) {
   return res;
 }
 
+// /api/mobile配下以外（AI採点・生成・TTS）にも生徒トークンを付けるためのヘッダー
+export async function authHeaders(): Promise<Record<string, string>> {
+  const token = await getStoredToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export async function apiGet<T>(path: string): Promise<T> {
   const res = await authedFetch(path);
   if (!res.ok) throw new Error(`GET ${path} failed (${res.status})`);

@@ -1,4 +1,5 @@
 import { BACKEND_URL } from '../config/api';
+import { authHeaders } from './mobileAuth';
 import { Profile } from '../store/ProfileContext';
 
 export type GeneratedDialogue = {
@@ -9,7 +10,7 @@ export type GeneratedDialogue = {
 export async function generateDialogueRemote(scene: string, profile: Profile): Promise<GeneratedDialogue> {
   const res = await fetch(`${BACKEND_URL}/api/generate/dialogue`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
     body: JSON.stringify({ scene, profile }),
   });
   if (!res.ok) throw new Error(`generate dialogue failed (${res.status})`);
@@ -21,7 +22,7 @@ export type GeneratedPresentation = { topic: string; paragraphsEN: string[]; par
 export async function generatePresentationRemote(profile: Profile, topic?: string): Promise<GeneratedPresentation> {
   const res = await fetch(`${BACKEND_URL}/api/generate/presentation`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
     body: JSON.stringify({ profile, topic }),
   });
   if (!res.ok) throw new Error(`generate presentation failed (${res.status})`);

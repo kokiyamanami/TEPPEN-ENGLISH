@@ -10,6 +10,7 @@ const { toFile } = require('openai/uploads');
 const { ALL_USERS_MOCK, OTHER_GROUPS_MOCK } = require('./rankingData');
 const adminRoutes = require('./adminRoutes');
 const mobileRoutes = require('./mobileRoutes');
+const { requireAuth } = mobileRoutes;
 
 const app = express();
 app.use(cors());
@@ -18,7 +19,9 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/mobile', mobileRoutes);
 app.use(express.static(path.join(__dirname, 'public')));
 
-const upload = multer({ dest: '/tmp/teppen-uploads/' });
+const UPLOAD_DIR = '/tmp/teppen-uploads/';
+fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+const upload = multer({ dest: UPLOAD_DIR, limits: { fileSize: 25 * 1024 * 1024 } });
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const TTS_CACHE_DIR = '/tmp/teppen-tts-cache';
@@ -35,11 +38,14 @@ app.get('/api/ranking', (req, res) => {
 
 // POST /api/grade
 // multipart/form-data: audio=<file>, taskLabel, promptEN, promptJP
-app.post('/api/grade', upload.single('audio'), async (req, res) => {
+app.post('/api/grade', requireAuth, upload.single('audio'), async (req, res) => {
   const file = req.file;
   if (!file) return res.status(400).json({ error: 'audio file is required' });
 
-  const { taskLabel = '', promptEN = '', promptJP = '' } = req.body;
+  const clip = (v) => String(v ?? '').slice(0, 500);
+  const taskLabel = clip(req.body.taskLabel);
+  const promptEN = clip(req.body.promptEN);
+  const promptJP = clip(req.body.promptJP);
 
   try {
     const transcriptionResp = await openai.audio.transcriptions.create({
@@ -70,7 +76,7 @@ app.post('/api/grade', upload.single('audio'), async (req, res) => {
     res.json({ transcript, pass: Boolean(parsed.pass), comment: String(parsed.comment || '') });
   } catch (err) {
     console.error('grade error:', err);
-    res.status(500).json({ error: 'grading_failed', detail: String(err.message || err) });
+    res.status(500).json({ error: 'grading_failed', });
   } finally {
     fs.unlink(file.path, () => {});
   }
@@ -78,7 +84,7 @@ app.post('/api/grade', upload.single('audio'), async (req, res) => {
 
 // POST /api/tts/prepare { text, voice } -> { url } (キャッシュ済みでなければOpenAI TTSで生成)
 const ALLOWED_VOICES = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
-app.post('/api/tts/prepare', async (req, res) => {
+app.post('/api/tts/prepare', requireAuth, async (req, res) => {
   const { text, voice = 'alloy' } = req.body || {};
   if (!text || typeof text !== 'string') return res.status(400).json({ error: 'text is required' });
   const safeVoice = ALLOWED_VOICES.includes(voice) ? voice : 'alloy';
@@ -99,15 +105,15 @@ app.post('/api/tts/prepare', async (req, res) => {
     res.json({ url: `/api/tts/audio/${hash}.mp3` });
   } catch (err) {
     console.error('tts error:', err);
-    res.status(500).json({ error: 'tts_failed', detail: String(err.message || err) });
+    res.status(500).json({ error: 'tts_failed', });
   }
 });
 
 app.get('/api/tts/audio/:file', (req, res) => {
+  // ファイル名はsha256.mp3のみ許可（パストラバーサル対策）
+  if (!/^[a-f0-9]{64}\.mp3$/.test(req.params.file)) return res.status(404).end();
   const filePath = path.join(TTS_CACHE_DIR, req.params.file);
-  if (!filePath.startsWith(TTS_CACHE_DIR) || !fs.existsSync(filePath)) {
-    return res.status(404).end();
-  }
+  if (!fs.existsSync(filePath)) return res.status(404).end();
   res.setHeader('Content-Type', 'audio/mpeg');
   fs.createReadStream(filePath).pipe(res);
 });
@@ -119,8 +125,9 @@ function joinOrFallback(value, fallback) {
 }
 
 // POST /api/generate/dialogue { scene, profile } -> AI生成の会話文
-app.post('/api/generate/dialogue', async (req, res) => {
-  const { scene = '', profile = {} } = req.body || {};
+app.post('/api/generate/dialogue', requireAuth, async (req, res) => {
+  const scene = String(req.body?.scene ?? '').slice(0, 200);
+  const profile = req.body?.profile && typeof req.body.profile === 'object' ? req.body.profile : {};
   try {
     const resp = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
@@ -143,13 +150,14 @@ app.post('/api/generate/dialogue', async (req, res) => {
     res.json(parsed);
   } catch (err) {
     console.error('generate dialogue error:', err);
-    res.status(500).json({ error: 'generate_failed', detail: String(err.message || err) });
+    res.status(500).json({ error: 'generate_failed', });
   }
 });
 
 // POST /api/generate/presentation { profile, topic? } -> AI生成のプレゼン原稿（4段落）
-app.post('/api/generate/presentation', async (req, res) => {
-  const { profile = {}, topic = '' } = req.body || {};
+app.post('/api/generate/presentation', requireAuth, async (req, res) => {
+  const topic = String(req.body?.topic ?? '').slice(0, 200);
+  const profile = req.body?.profile && typeof req.body.profile === 'object' ? req.body.profile : {};
   try {
     const resp = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
@@ -172,7 +180,7 @@ app.post('/api/generate/presentation', async (req, res) => {
     res.json(parsed);
   } catch (err) {
     console.error('generate presentation error:', err);
-    res.status(500).json({ error: 'generate_failed', detail: String(err.message || err) });
+    res.status(500).json({ error: 'generate_failed', });
   }
 });
 

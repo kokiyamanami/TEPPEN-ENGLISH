@@ -1,4 +1,5 @@
 import { BACKEND_URL } from '../config/api';
+import { authHeaders } from './mobileAuth';
 
 export type GradingResult = { transcript: string; pass: boolean; comment: string };
 
@@ -21,6 +22,7 @@ export async function submitForGrading(
   // Content-Typeは指定しない: fetchがFormDataから正しいmultipart境界を自動付与する
   const res = await fetch(`${BACKEND_URL}/api/grade`, {
     method: 'POST',
+    headers: await authHeaders(),
     body: formData,
   });
 

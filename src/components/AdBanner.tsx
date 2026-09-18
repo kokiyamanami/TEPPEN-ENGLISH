@@ -40,7 +40,7 @@ export function AdBanner({ placement = 'home' }: { placement?: 'home' | 'talk' |
     <Pressable
       style={styles.banner}
       onPress={() => {
-        if (ad.linkUrl) Linking.openURL(ad.linkUrl).catch(() => {});
+        if (/^https?:\/\//i.test(ad.linkUrl)) Linking.openURL(ad.linkUrl).catch(() => {});
       }}
     >
       <Image source={{ uri: resolveImageUri(ad.imageUrl) }} style={styles.image} resizeMode="cover" />

@@ -6,13 +6,17 @@ const fs = require('fs');
 const path = require('path');
 const OpenAI = require('openai');
 const db = require('./db');
+const { lookupDictionary } = require('./dictionary');
 
 const router = express.Router();
+if (!process.env.STUDENT_JWT_SECRET && process.env.NODE_ENV === 'production') {
+  throw new Error('STUDENT_JWT_SECRET must be set in production');
+}
 const JWT_SECRET = process.env.STUDENT_JWT_SECRET || 'teppen-english-student-dev-secret';
 
 const AVATAR_DIR = path.join(__dirname, 'public', 'avatars');
 fs.mkdirSync(AVATAR_DIR, { recursive: true });
-const avatarUpload = multer({ dest: '/tmp/teppen-uploads/' });
+const avatarUpload = multer({ dest: '/tmp/teppen-uploads/', limits: { fileSize: 10 * 1024 * 1024 } });
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -30,14 +34,21 @@ function requireAuth(req, res, next) {
   }
 }
 
+// 日本時間(JST)基準の日付。toISOString()はUTCのため、JSTの0〜9時に前日扱いになってしまう
+function jstDate(d = new Date()) {
+  return new Date(d.getTime() + 9 * 60 * 60 * 1000);
+}
+
 function todayStr() {
-  return new Date().toISOString().slice(0, 10);
+  return jstDate().toISOString().slice(0, 10);
 }
 
 // ---- auth ----
 router.post('/signup', (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'email and password are required' });
+  if (typeof email !== 'string' || typeof password !== 'string') return res.status(400).json({ error: 'invalid input' });
+  if (password.length < 8) return res.status(400).json({ error: 'パスワードは8文字以上にしてください' });
 
   // 管理画面でメールアドレス付きの生徒レコードが先に作られている場合があるため、
   // password_hash未設定（＝まだ本人がサインアップしていない）ならそのレコードを引き継ぐ
@@ -69,6 +80,7 @@ router.post('/signup', (req, res) => {
 
 router.post('/login', (req, res) => {
   const { email, password } = req.body || {};
+  if (typeof email !== 'string') return res.status(401).json({ error: 'メールアドレスまたはパスワードが正しくありません' });
   const student = db.prepare('SELECT * FROM students WHERE email = ?').get(email);
   if (!student || !student.password_hash || !bcrypt.compareSync(password || '', student.password_hash)) {
     return res.status(401).json({ error: 'メールアドレスまたはパスワードが正しくありません' });
@@ -127,14 +139,14 @@ router.post('/avatar', avatarUpload.single('avatar'), (req, res) => {
   } catch (err) {
     console.error('avatar upload error:', err);
     fs.unlink(file.path, () => {});
-    res.status(500).json({ error: 'avatar_upload_failed', detail: String(err.message || err) });
+    res.status(500).json({ error: 'avatar_upload_failed' });
   }
 });
 
 // オンボーディング各ステップの「次へ」で呼び出し、途中離脱しても再開できるようにする
 router.post('/onboarding-progress', (req, res) => {
   const { step } = req.body || {};
-  if (!step) return res.status(400).json({ error: 'step is required' });
+  if (typeof step !== 'string' || !/^ob[a-z0-9_]{1,20}$/.test(step)) return res.status(400).json({ error: 'invalid step' });
   db.prepare('UPDATE students SET onboarding_step = ? WHERE id = ?').run(step, req.studentId);
   res.json({ ok: true });
 });
@@ -148,7 +160,9 @@ router.patch('/profile', (req, res) => {
   const student = db.prepare('SELECT * FROM students WHERE id = ?').get(req.studentId);
   if (!student) return res.status(404).json({ error: 'not_found' });
   const current = JSON.parse(student.profile_json || '{}');
-  const updated = { ...current, ...(req.body || {}) };
+  const incoming = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+  if (JSON.stringify(incoming).length > 10000) return res.status(413).json({ error: 'profile too large' });
+  const updated = { ...current, ...incoming };
   db.prepare('UPDATE students SET profile_json = ?, name = ? WHERE id = ?').run(
     JSON.stringify(updated),
     updated.name || student.name || '',
@@ -212,9 +226,10 @@ router.post('/records', (req, res) => {
   // 分割代入のデフォルト値はundefinedにしか効かないため、明示的にnull/undefinedをまとめて弾く
   const category = body.category ?? 'other';
   const subcategories = body.subcategories ?? [];
-  const minutes = body.minutes ?? 0;
+  const minutes = Math.round(Number(body.minutes ?? 0));
   const memo = body.memo ?? '';
-  if (!date) return res.status(400).json({ error: 'date is required' });
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(String(date))) return res.status(400).json({ error: 'date must be YYYY-MM-DD' });
+  if (!Number.isFinite(minutes) || minutes < 0 || minutes > 1440) return res.status(400).json({ error: 'minutes must be 0-1440' });
   const speakMin = category === 'speaking' ? minutes : Math.round(minutes * 0.3);
 
   // idが指定され、自分の記録であれば更新。それ以外は常に新規追加（同日複数件を許可）
@@ -245,7 +260,7 @@ router.get('/phrase-folders', (req, res) => {
 
 router.post('/phrase-folders', (req, res) => {
   const { name } = req.body || {};
-  if (!name) return res.status(400).json({ error: 'name is required' });
+  if (!name || typeof name !== 'string') return res.status(400).json({ error: 'name is required' });
   const info = db.prepare("INSERT INTO phrase_folders (student_id, name, source) VALUES (?, ?, 'custom')").run(req.studentId, name);
   res.json({ id: info.lastInsertRowid });
 });
@@ -280,7 +295,7 @@ router.patch('/phrases/:id', (req, res) => {
 // ---- monthly mission（AI添削結果を管理画面と共有するテーブルに記録） ----
 router.post('/monthly-mission', (req, res) => {
   const { pass } = req.body || {};
-  const month = new Date().toISOString().slice(0, 7);
+  const month = todayStr().slice(0, 7);
   const existing = db.prepare('SELECT id FROM monthly_mission_results WHERE student_id = ? AND month = ?').get(req.studentId, month);
   if (existing) {
     db.prepare('UPDATE monthly_mission_results SET pass = ?, date = ? WHERE id = ?').run(pass ? 1 : 0, todayStr(), existing.id);
@@ -296,17 +311,17 @@ router.post('/monthly-mission', (req, res) => {
 });
 
 function mondayOfStr(d) {
-  const x = new Date(d);
-  const day = x.getDay();
+  const x = jstDate(d);
+  const day = x.getUTCDay();
   const diff = day === 0 ? -6 : 1 - day;
-  x.setDate(x.getDate() + diff);
+  x.setUTCDate(x.getUTCDate() + diff);
   return x.toISOString().slice(0, 10);
 }
 
 // ---- daily mission（type: 'photo' | 'question'、1日1件ずつ記録） ----
 router.post('/daily-mission', (req, res) => {
   const { type, pass } = req.body || {};
-  if (!type) return res.status(400).json({ error: 'type is required' });
+  if (!['photo', 'question'].includes(type)) return res.status(400).json({ error: "type must be 'photo' or 'question'" });
   const date = todayStr();
   const existing = db
     .prepare('SELECT id FROM daily_mission_results WHERE student_id = ? AND date = ? AND type = ?')
@@ -393,13 +408,20 @@ router.post('/chat-ai', async (req, res) => {
   }
 });
 
-// ---- 単語の意味（英文中の単語を長押しした時の簡易辞書。文脈に合った意味をLLMで返す） ----
+// ---- 単語の意味（英文中の単語を長押しした時の簡易辞書） ----
+// まずローカルの英和辞書(EJDict)を引いて即返す（無料・高速）。辞書にない語、または mode:'ai' の時は
+// 文脈に合った意味をLLMで返す
 const wordLookupCache = new Map();
 
 router.post('/word-lookup', async (req, res) => {
   const word = String(req.body?.word || '').trim().slice(0, 60);
   const sentence = String(req.body?.sentence || '').trim().slice(0, 400);
   if (!word) return res.status(400).json({ error: 'word is required' });
+
+  if (req.body?.mode !== 'ai') {
+    const hit = lookupDictionary(word);
+    if (hit) return res.json({ source: 'dictionary', word: hit.word, senses: hit.senses });
+  }
 
   const cacheKey = `${word.toLowerCase()}::${sentence}`;
   if (wordLookupCache.has(cacheKey)) return res.json(wordLookupCache.get(cacheKey));
@@ -421,6 +443,7 @@ router.post('/word-lookup', async (req, res) => {
     });
     const parsed = JSON.parse(resp.choices[0].message.content);
     const result = {
+      source: 'ai',
       word: String(parsed.word || word),
       pos: String(parsed.pos || ''),
       meaning: String(parsed.meaning || ''),
@@ -464,4 +487,5 @@ router.post('/chat', (req, res) => {
   res.json({ id: info.lastInsertRowid });
 });
 
+router.requireAuth = requireAuth;
 module.exports = router;
