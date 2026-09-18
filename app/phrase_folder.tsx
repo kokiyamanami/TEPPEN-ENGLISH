@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { TopBar } from '../src/components/TopBar';
@@ -81,9 +81,6 @@ export default function PhraseFolderScreen() {
 
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>{folder.name}</Text>
-        <Pressable onPress={() => router.push({ pathname: '/quiz', params: { folderId: folder.id } } as never)}>
-          <Text style={styles.link}>クイズにする</Text>
-        </Pressable>
       </View>
 
       <ScrollView ref={pager} style={{ flexGrow: 0 }} horizontal pagingEnabled showsHorizontalScrollIndicator={false} onMomentumScrollEnd={onSwipeEnd}>
@@ -128,7 +125,7 @@ export default function PhraseFolderScreen() {
           try {
             const r = await markLearned(current.id);
             if (r.mastered) Alert.alert('マスター！', `「${current.text}」を${MASTER_COUNT}回覚えました。履歴に移動しました。`);
-            else if (!r.already) next();
+            else next();
           } catch {
             Alert.alert('記録できませんでした', '通信状況を確認して、もう一度お試しください。');
           }
