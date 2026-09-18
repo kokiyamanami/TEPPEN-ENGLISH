@@ -50,7 +50,7 @@ export function TodayTimeWidget() {
     <View style={styles.card}>
       <Ring label="今日の発話時間" doneMin={todaySpeakMinutes} goalMin={speakGoal} color={colors.coral} />
       <View style={styles.divider} />
-      <Ring label="今日の学習時間" doneMin={todayStudyMinutes} goalMin={studyGoal} color={colors.navy} />
+      <Ring label="今日の学習時間" doneMin={todayStudyMinutes} goalMin={studyGoal} color={colors.success} />
     </View>
   );
 }
