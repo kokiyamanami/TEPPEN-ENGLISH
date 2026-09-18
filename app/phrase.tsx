@@ -9,7 +9,7 @@ import { colors, radius, spacing } from '../src/theme/colors';
 import { useTopInset } from '../src/hooks/useTopInset';
 
 const SECTIONS: { source: PhraseFolderSource; title: string; desc: string; empty: string }[] = [
-  { source: 'curated', title: 'カスタマイズ教材', desc: 'あなたの職業・趣味・性格・経歴に合わせて、AIが作った専用の教材です。「新しく作る」で追加できます（今あるものは消えません）', empty: 'あなたのプロフィールからAIが専用の教材を作成中です。1分ほどで表示されます' },
+  { source: 'curated', title: 'カスタマイズ教材', desc: 'あなたの職業・趣味・性格・経歴に合わせて、AIが作った専用の教材です。「AIで追加」を押すと新しい教材が増えます（今あるものは消えません）', empty: 'あなたのプロフィールからAIが専用の教材を作成中です。1分ほどで表示されます' },
   { source: 'official', title: '運営提供', desc: 'あなたの英語レベルに合わせた、覚えてほしい単語・フレーズです', empty: 'あなたのレベルの教材が用意され次第、ここに表示されます' },
   { source: 'custom', title: 'マイフォルダ', desc: '自由に追加・編集・削除できる、あなた専用のフォルダです', empty: '' },
 ];
@@ -48,7 +48,7 @@ export default function PhraseScreen() {
       }, 4000);
     } catch (e) {
       setGenerating(false);
-      Alert.alert('作成できませんでした', String((e as Error).message).includes('429') ? '続けて作成できません。少し待ってからお試しください。' : '通信状況を確認して、もう一度お試しください。');
+      Alert.alert('追加できませんでした', String((e as Error).message).includes('429') ? '続けて追加できません。少し待ってからお試しください。' : '通信状況を確認して、もう一度お試しください。');
     }
   };
   const [tab, setTab] = useState<PhraseContentType>('phrase');
@@ -100,7 +100,7 @@ export default function PhraseScreen() {
               {sec.source === 'curated' && (
                 <Pressable style={styles.genBtn} onPress={generateMore} disabled={generating}>
                   {generating ? <ActivityIndicator size="small" color={colors.coral} /> : <Ionicons name="sparkles-outline" size={12} color={colors.coral} />}
-                  <Text style={styles.genBtnText}>{generating ? '作成中…' : 'AIで新しく作る'}</Text>
+                  <Text style={styles.genBtnText}>{generating ? '追加中…' : 'AIで追加'}</Text>
                 </Pressable>
               )}
             </View>
