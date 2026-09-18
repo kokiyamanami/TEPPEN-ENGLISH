@@ -83,6 +83,13 @@ export function OnboardFieldInput({ field }: { field: OnboardField }) {
           maxLength={field.maxLength}
           onChangeText={(text) => setField(field.field, text as Profile[typeof field.field])}
         />
+        {field.recommendMin && strValue.length < field.recommendMin ? (
+          <Text style={styles.nudge}>
+            {strValue.length === 0
+              ? 'ここは教材づくりの大切な材料です。ぜひ、思いつくことを書いてみてください。お願いします！'
+              : `あと${field.recommendMin - strValue.length}文字ほど、もう少し詳しく教えてください。書いてもらえるほど、あなたに合った教材が作れます。`}
+          </Text>
+        ) : null}
       </View>
     );
   }
@@ -186,6 +193,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.textPrimary,
   },
+  nudge: { fontSize: 11, color: colors.coral, marginTop: 6, lineHeight: 16 },
   textarea: { minHeight: 132, textAlignVertical: 'top' },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   chip: {
