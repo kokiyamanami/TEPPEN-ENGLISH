@@ -339,6 +339,27 @@ router.patch('/announcements/:id', (req, res) => {
 });
 
 // ---- lectures（モバイルアプリの「動画」カテゴリで配信するYouTube動画） ----
+// 管理画面側でもURLからIDを抽出しているが、古いキャッシュ済みJS等から生URLがそのまま
+// 送られてくるケースに備えて、サーバー側でも同じ抽出をかけてから保存する（二重の安全網）
+function extractYoutubeId(input) {
+  const trimmed = String(input || '').trim();
+  try {
+    const url = new URL(trimmed);
+    if (url.hostname.includes('youtu.be')) {
+      return url.pathname.split('/').filter(Boolean)[0] || trimmed;
+    }
+    if (url.hostname.includes('youtube.com')) {
+      const v = url.searchParams.get('v');
+      if (v) return v;
+      const match = url.pathname.match(/\/(embed|shorts)\/([^/?]+)/);
+      if (match) return match[2];
+    }
+  } catch {
+    // URLとして解釈できない場合はIDそのものとして扱う
+  }
+  return trimmed;
+}
+
 router.get('/lectures', (req, res) => {
   res.json(db.prepare('SELECT * FROM lectures ORDER BY sort_order, id').all());
 });
@@ -348,7 +369,7 @@ router.post('/lectures', (req, res) => {
   if (!youtubeId || !title) return res.status(400).json({ error: 'youtubeId and title are required' });
   const info = db
     .prepare('INSERT INTO lectures (youtube_id, title, instructor, category, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(youtubeId, title, instructor, category, sortOrder, new Date().toISOString().slice(0, 10));
+    .run(extractYoutubeId(youtubeId), title, instructor, category, sortOrder, new Date().toISOString().slice(0, 10));
   res.json({ id: info.lastInsertRowid });
 });
 
@@ -359,7 +380,14 @@ router.patch('/lectures/:id', (req, res) => {
       youtube_id = COALESCE(?, youtube_id), title = COALESCE(?, title), instructor = COALESCE(?, instructor),
       category = COALESCE(?, category), sort_order = COALESCE(?, sort_order)
      WHERE id = ?`
-  ).run(youtubeId ?? null, title ?? null, instructor ?? null, category ?? null, sortOrder === undefined ? null : sortOrder, req.params.id);
+  ).run(
+    youtubeId ? extractYoutubeId(youtubeId) : null,
+    title ?? null,
+    instructor ?? null,
+    category ?? null,
+    sortOrder === undefined ? null : sortOrder,
+    req.params.id
+  );
   res.json({ ok: true });
 });
 
