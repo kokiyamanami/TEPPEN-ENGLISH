@@ -16,6 +16,8 @@ type Student = {
   status: string;
   last_login: string;
   weeklySpeakMin: number;
+  studyGoal: number;
+  speakGoal: number;
   monthlyMissions: { month: string; pass: number; date: string }[];
 };
 
@@ -200,6 +202,7 @@ export default function Students() {
             </th>
             <th>氏名</th>
             <th>グループ</th>
+            <th>1日の目標（学習/発話）</th>
             <th>発話時間（週）</th>
             <th>Monthlyミッション</th>
             <th>最終ログイン</th>
@@ -231,6 +234,9 @@ export default function Students() {
                   ) : (
                     <span className="tag">未所属</span>
                   )}
+                </td>
+                <td>
+                  {s.studyGoal}分 / {s.speakGoal}分
                 </td>
                 <td>{s.weeklySpeakMin}分</td>
                 <td>

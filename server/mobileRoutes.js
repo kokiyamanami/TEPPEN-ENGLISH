@@ -8,6 +8,7 @@ const OpenAI = require('openai');
 const db = require('./db');
 const { todayStr, mondayOfStr } = require('./dateUtil');
 const { lookupDictionary } = require('./dictionary');
+const { REST_LIMIT_PER_MONTH, goalHistory, restDays, currentGoal } = require('./goals');
 
 const router = express.Router();
 if (!process.env.STUDENT_JWT_SECRET && process.env.NODE_ENV === 'production') {
@@ -188,6 +189,55 @@ router.get('/study-summary', (req, res) => {
     .prepare('SELECT COALESCE(SUM(study_min), 0) as study, COALESCE(SUM(speak_min), 0) as speak FROM speaking_stats WHERE student_id = ? AND date = ?')
     .get(req.studentId, today);
   res.json({ totalStudyMinutes: row.total, todayStudyMinutes: t.study, todaySpeakMinutes: t.speak });
+});
+
+// ---- goals（1日の目標。変更履歴を持ち、過去の日は当時の目標で判定する）・お休み日 ----
+const isDate = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v));
+const dayShift = (dateStr, n) => {
+  const d = new Date(dateStr + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+};
+
+function goalsPayload(studentId) {
+  const history = goalHistory(studentId);
+  const cur = currentGoal(history);
+  return { current: { study: cur.study, speak: cur.speak }, history, restDays: restDays(studentId), restLimitPerMonth: REST_LIMIT_PER_MONTH };
+}
+
+router.get('/goals', (req, res) => res.json(goalsPayload(req.studentId)));
+
+router.put('/goals', (req, res) => {
+  const { studyGoal, speakGoal } = req.body || {};
+  const today = isDate(req.body?.today) ? req.body.today : todayStr();
+  const ok = (v) => Number.isInteger(v) && v >= 1 && v <= 1440;
+  if (!ok(studyGoal) || !ok(speakGoal)) return res.status(400).json({ error: 'invalid_goal' });
+  const existing = db.prepare('SELECT id FROM goal_history WHERE student_id = ? AND effective_from = ?').get(req.studentId, today);
+  if (existing) db.prepare('UPDATE goal_history SET study_goal = ?, speak_goal = ? WHERE id = ?').run(studyGoal, speakGoal, existing.id);
+  else db.prepare('INSERT INTO goal_history (student_id, effective_from, study_goal, speak_goal) VALUES (?, ?, ?, ?)').run(req.studentId, today, studyGoal, speakGoal);
+  res.json(goalsPayload(req.studentId));
+});
+
+// お休みは、2日前〜未来の日に月4回まで設定できる（後出しで連続記録を守るのを防ぐ）
+router.post('/rest-days', (req, res) => {
+  const { date } = req.body || {};
+  const today = isDate(req.body?.today) ? req.body.today : todayStr();
+  if (!isDate(date)) return res.status(400).json({ error: 'invalid_date' });
+  if (date < dayShift(today, -2)) return res.status(400).json({ error: 'too_old' });
+  const month = date.slice(0, 7);
+  const rests = restDays(req.studentId);
+  if (rests.includes(date)) return res.json(goalsPayload(req.studentId));
+  if (rests.filter((d) => d.startsWith(month)).length >= REST_LIMIT_PER_MONTH) return res.status(400).json({ error: 'limit_reached' });
+  db.prepare('INSERT INTO rest_days (student_id, date) VALUES (?, ?)').run(req.studentId, date);
+  res.json(goalsPayload(req.studentId));
+});
+
+router.delete('/rest-days/:date', (req, res) => {
+  const today = isDate(req.query.today) ? String(req.query.today) : todayStr();
+  if (!isDate(req.params.date)) return res.status(400).json({ error: 'invalid_date' });
+  if (req.params.date < today) return res.status(400).json({ error: 'past_locked' });
+  db.prepare('DELETE FROM rest_days WHERE student_id = ? AND date = ?').run(req.studentId, req.params.date);
+  res.json(goalsPayload(req.studentId));
 });
 
 // ---- announcements（公開済みで自分宛て「全生徒」または所属グループ宛てのもの） ----

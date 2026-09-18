@@ -23,6 +23,7 @@ type StudentDetailData = {
   unitSubmissions: { id: number; unit: number; submitted_at: string; status: string }[];
   chatMessages: { id: number; sender: string; text: string; time: string }[];
   phrases: { id: number; text: string; folder_name: string }[];
+  goals: { current: { study: number; speak: number }; history: { from: string; study: number; speak: number }[]; restDays: string[] };
 };
 
 export default function StudentDetail() {
@@ -237,8 +238,42 @@ export default function StudentDetail() {
       </div>
 
       <div className="grid-2">
-        {/* スピーキング履歴 + チャット */}
+        {/* 目標 + スピーキング履歴 + チャット */}
         <div>
+          <div className="section-title">1日の目標時間</div>
+          <div className="card">
+            <div style={{ marginBottom: 8 }}>
+              現在: 学習 <b>{data.goals.current.study}分</b> / 発話 <b>{data.goals.current.speak}分</b>
+              <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>（受講生本人が変更できます）</span>
+            </div>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>適用開始日</th>
+                  <th>学習</th>
+                  <th>発話</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.goals.history.length === 0 && (
+                  <tr>
+                    <td colSpan={3}>変更履歴なし（初期値）</td>
+                  </tr>
+                )}
+                {data.goals.history.map((g) => (
+                  <tr key={g.from}>
+                    <td>{g.from}</td>
+                    <td>{g.study}分</td>
+                    <td>{g.speak}分</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {data.goals.restDays.length > 0 && (
+              <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-secondary)' }}>お休み日（直近）: {data.goals.restDays.join(', ')}</div>
+            )}
+          </div>
+
           <div className="section-title">スピーキング履歴</div>
           <div className="card" style={{ maxHeight: 220, overflowY: 'auto' }}>
             <table className="table">

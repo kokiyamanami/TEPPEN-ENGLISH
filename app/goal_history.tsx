@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TopBar } from '../src/components/TopBar';
@@ -15,6 +15,11 @@ export default function GoalHistoryScreen() {
   const { setField } = useProfile();
   const [studyInput, setStudyInput] = useState(String(studyGoal));
   const [speakInput, setSpeakInput] = useState(String(speakGoal));
+  // サーバーから目標を読み込んだ後に入力欄へ反映する
+  useEffect(() => {
+    setStudyInput(String(studyGoal));
+    setSpeakInput(String(speakGoal));
+  }, [studyGoal, speakGoal]);
   const [showNewGoal, setShowNewGoal] = useState(false);
   const [newGoalText, setNewGoalText] = useState('');
 

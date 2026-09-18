@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { StudyLogEntry } from '../data/records';
 import { colors, radius, spacing } from '../theme/colors';
 import { dateKey } from '../utils/dateHelpers';
@@ -7,35 +8,59 @@ import { dateKey } from '../utils/dateHelpers';
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 const FLAME = '#F2711C';
 const FLAME_HOT = '#E5484D';
+const RAINBOW = ['#FF3B30', '#FF9500', '#FFD60A', '#34C759', '#0A84FF', '#AF52DE'];
+const REST_BG = 'rgba(100,116,139,0.16)';
 
 export type StreakInfo = { current: number; best: number; todayAchieved: boolean; remainingMin: number };
 
+// 1日以上: オレンジ / 7日以上: 赤 / 14日以上: 金 / 30日以上: 虹色
 function flameColor(n: number) {
   if (n <= 0) return colors.textSecondary;
-  if (n >= 30) return colors.goldAccent;
+  if (n >= 14) return colors.goldAccent;
   if (n >= 7) return FLAME_HOT;
   return FLAME;
 }
 
+function FlameBadge({ current }: { current: number }) {
+  const rainbow = current >= 30;
+  return (
+    <View style={styles.flameCircle}>
+      <Svg width={48} height={48} style={StyleSheet.absoluteFill}>
+        <Defs>
+          <LinearGradient id="rb" x1="0" y1="0" x2="1" y2="1">
+            {RAINBOW.map((c, i) => (
+              <Stop key={c} offset={i / (RAINBOW.length - 1)} stopColor={c} />
+            ))}
+          </LinearGradient>
+        </Defs>
+        <Circle cx={24} cy={24} r={24} fill={rainbow ? 'url(#rb)' : current > 0 ? flameColor(current) : colors.border} />
+      </Svg>
+      <Ionicons name={current > 0 ? 'flame' : 'flame-outline'} size={26} color={current > 0 ? colors.white : colors.textSecondary} />
+    </View>
+  );
+}
+
 // 連続達成日数の表示。今日まだ達成していなくても、昨日まで続いていれば日付が変わるまでは継続扱い
-export function StreakBanner({ streak }: { streak: StreakInfo }) {
+export function StreakBanner({ streak, onOpenRest }: { streak: StreakInfo; onOpenRest: () => void }) {
   const { current, best, todayAchieved, remainingMin } = streak;
-  const color = flameColor(current);
+  const color = current >= 30 ? '#AF52DE' : flameColor(current);
   let message: string;
   if (current === 0) message = 'まずは今日の目標を達成して、火を灯そう';
   else if (todayAchieved) message = '今日の目標達成！この調子で明日もつなげよう';
   else message = `あと${remainingMin}分で今日も達成。連続記録をつなごう！`;
   return (
     <View style={[styles.streakCard, current > 0 && { borderColor: color }]}>
-      <View style={[styles.flameCircle, { backgroundColor: current > 0 ? color : colors.border }]}>
-        <Ionicons name={current > 0 ? 'flame' : 'flame-outline'} size={26} color={current > 0 ? colors.white : colors.textSecondary} />
-      </View>
+      <FlameBadge current={current} />
       <View style={{ flex: 1 }}>
         <Text style={styles.streakMain}>
           <Text style={[styles.streakNum, { color }]}>{current}</Text>
           <Text style={styles.streakUnit}> 日連続達成中</Text>
         </Text>
         <Text style={styles.streakMsg}>{message}</Text>
+        <Pressable style={styles.restBtn} onPress={onOpenRest} hitSlop={6}>
+          <Ionicons name="moon-outline" size={12} color={colors.coral} />
+          <Text style={styles.restBtnText}>お休みを設定</Text>
+        </Pressable>
       </View>
       <View style={styles.bestBox}>
         <Text style={styles.bestLabel}>自己ベスト</Text>
@@ -49,6 +74,7 @@ export function CalendarGrid({
   month,
   entries,
   achieved,
+  restDays,
   onPrevMonth,
   onNextMonth,
   onSelectDay,
@@ -56,6 +82,7 @@ export function CalendarGrid({
   month: Date;
   entries: Record<string, StudyLogEntry[]>;
   achieved: Set<string>;
+  restDays: Set<string>;
   onPrevMonth: () => void;
   onNextMonth: () => void;
   onSelectDay: (d: Date) => void;
@@ -103,6 +130,7 @@ export function CalendarGrid({
             const isToday = cellDate.getTime() === today.getTime();
             const hasData = !!entries[dateKey(cellDate)]?.length;
             const isAchieved = achieved.has(dateKey(cellDate));
+            const isRest = !isAchieved && restDays.has(dateKey(cellDate));
             const col = (startWeekday + d - 1) % 7;
             // 連続で目標達成した日は帯でつなげて表示する（週の端では区切る）
             const joinLeft = isAchieved && col > 0 && achieved.has(dateKey(new Date(year, mo, d - 1)));
@@ -113,12 +141,13 @@ export function CalendarGrid({
                   style={[
                     styles.cellInner,
                     hasData && styles.cellHasData,
+                    isRest && styles.cellRest,
                     isAchieved && styles.cellAchieved,
                     isAchieved && { borderTopLeftRadius: joinLeft ? 0 : 999, borderBottomLeftRadius: joinLeft ? 0 : 999, borderTopRightRadius: joinRight ? 0 : 999, borderBottomRightRadius: joinRight ? 0 : 999 },
                     isToday && styles.cellToday,
                   ]}
                 >
-                  <Text style={[styles.cellText, hasData && styles.cellTextData, isAchieved && styles.cellTextAchieved, isFuture && styles.cellTextFuture]}>{d}</Text>
+                  <Text style={[styles.cellText, isRest && styles.cellTextRest, hasData && styles.cellTextData, isAchieved && styles.cellTextAchieved, isFuture && styles.cellTextFuture]}>{d}</Text>
                 </View>
               </Pressable>
             );
@@ -139,6 +168,10 @@ export function CalendarGrid({
           <View style={[styles.legendSw, { backgroundColor: FLAME }]} />
           <Text style={styles.legendText}>目標達成</Text>
         </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendSw, { backgroundColor: 'rgba(100,116,139,0.45)' }]} />
+          <Text style={styles.legendText}>お休み</Text>
+        </View>
       </View>
     </View>
   );
@@ -157,14 +190,18 @@ const styles = StyleSheet.create({
   cell: { width: CELL_SIZE, height: 36, justifyContent: 'center', marginVertical: 2 },
   cellInner: { height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 999 },
   cellHasData: { backgroundColor: 'rgba(7,111,179,0.15)' },
+  cellRest: { backgroundColor: REST_BG },
   cellAchieved: { backgroundColor: FLAME },
   cellToday: { borderWidth: 1.5, borderColor: colors.navy },
   cellText: { fontSize: 11, color: colors.textPrimary },
   cellTextData: { color: colors.coral, fontWeight: '700' },
+  cellTextRest: { color: colors.textSecondary, fontWeight: '600' },
   cellTextAchieved: { color: colors.white, fontWeight: '800' },
   cellTextFuture: { color: colors.border },
   streakCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.white, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.border, padding: spacing.md, marginBottom: spacing.md },
-  flameCircle: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  flameCircle: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
+  restBtn: { flexDirection: 'row', alignItems: 'center', gap: 3, alignSelf: 'flex-start', marginTop: 6 },
+  restBtnText: { fontSize: 11, color: colors.coral, fontWeight: '600' },
   streakMain: { color: colors.textPrimary },
   streakNum: { fontSize: 28, fontWeight: '800' },
   streakUnit: { fontSize: 13, fontWeight: '700' },
@@ -172,7 +209,7 @@ const styles = StyleSheet.create({
   bestBox: { alignItems: 'center' },
   bestLabel: { fontSize: 9, color: colors.textSecondary },
   bestValue: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
-  legend: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.sm },
+  legend: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.sm },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   legendSw: { width: 8, height: 8, borderRadius: 2 },
   legendText: { fontSize: 10, color: colors.textSecondary },

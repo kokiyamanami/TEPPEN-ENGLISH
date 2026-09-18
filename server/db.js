@@ -44,6 +44,22 @@ CREATE TABLE IF NOT EXISTS students (
   avatar_url TEXT
 );
 
+-- 1日の目標の変更履歴。変更した日から有効で、過去の日は当時の目標で判定する
+CREATE TABLE IF NOT EXISTS goal_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  student_id INTEGER NOT NULL REFERENCES students(id),
+  effective_from TEXT NOT NULL,
+  study_goal INTEGER NOT NULL,
+  speak_goal INTEGER NOT NULL
+);
+
+-- お休み（凍結）日。連続達成日数を途切れさせない
+CREATE TABLE IF NOT EXISTS rest_days (
+  student_id INTEGER NOT NULL REFERENCES students(id),
+  date TEXT NOT NULL,
+  PRIMARY KEY (student_id, date)
+);
+
 -- 1日に複数件登録できるよう、student_id×dateのUNIQUE制約は付けない
 CREATE TABLE IF NOT EXISTS speaking_stats (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const db = require('./db');
 const { todayStr } = require('./dateUtil');
+const { goalHistory, restDays, currentGoal } = require('./goals');
 
 const router = express.Router();
 if (!process.env.ADMIN_JWT_SECRET && process.env.NODE_ENV === 'production') {
@@ -123,7 +124,8 @@ router.get('/students', (req, res) => {
     const monthly = db
       .prepare(`SELECT month, pass, date FROM monthly_mission_results WHERE student_id = ? ORDER BY month DESC`)
       .all(s.id);
-    return { ...s, weeklySpeakMin: speak, monthlyMissions: monthly };
+    const goal = currentGoal(goalHistory(s.id));
+    return { ...s, weeklySpeakMin: speak, monthlyMissions: monthly, studyGoal: goal.study, speakGoal: goal.speak };
   });
 
   res.json(withStats);
@@ -225,7 +227,10 @@ router.get('/students/:id', (req, res) => {
     )
     .all(req.params.id);
 
-  res.json({ student, speakingStats, monthlyMissions, phaseHistory, unitSubmissions, chatMessages, phrases });
+  const history = goalHistory(req.params.id);
+  const goals = { current: currentGoal(history), history: [...history].reverse(), restDays: restDays(req.params.id).reverse().slice(0, 10) };
+
+  res.json({ student, speakingStats, monthlyMissions, phaseHistory, unitSubmissions, chatMessages, phrases, goals });
 });
 
 router.post('/students/:id/phase', (req, res) => {

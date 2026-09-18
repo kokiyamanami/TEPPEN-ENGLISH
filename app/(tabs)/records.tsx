@@ -3,7 +3,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { apiDelete, apiGet, apiPost } from '../../src/api/mobileAuth';
 import { fetchRanking, RankingGroup, RankingUser } from '../../src/api/ranking';
-import { CalendarGrid, StreakBanner, StreakInfo } from '../../src/components/CalendarGrid';
+import { CalendarGrid, StreakBanner } from '../../src/components/CalendarGrid';
+import { RestDaysModal } from '../../src/components/RestDaysModal';
 import { DaySheet } from '../../src/components/DaySheet';
 import { RecordChart } from '../../src/components/RecordChart';
 import { ScreenHeader } from '../../src/components/ScreenHeader';
@@ -25,7 +26,8 @@ import { useProfile } from '../../src/store/ProfileContext';
 import { useSpeakingLog } from '../../src/hooks/useSpeakingLog';
 import { useStats } from '../../src/store/StatsContext';
 import { colors, radius, spacing } from '../../src/theme/colors';
-import { addDays, dateKey, formatMin, shortMd } from '../../src/utils/dateHelpers';
+import { computeStreak } from '../../src/utils/streak';
+import { dateKey, formatMin, shortMd } from '../../src/utils/dateHelpers';
 
 type MobileRecord = { id: number; date: string; study_min: number; speak_min: number; category: string | null; subcategories: string[]; memo: string | null };
 
@@ -35,7 +37,7 @@ const WINDOW: Record<RecordPeriod, number> = { day: 7, week: 6, month: Infinity,
 // screen key: records
 export default function RecordsScreen() {
   const { profile } = useProfile();
-  const { studyGoal, speakGoal } = useGoals();
+  const { studyGoal, speakGoal, goalHistory, restDays } = useGoals();
   const { reload: reloadStats } = useStats();
   const [scope, setScope] = useState<RecordScope>('personal');
   const [period, setPeriod] = useState<RecordPeriod>('day');
@@ -86,35 +88,16 @@ export default function RecordsScreen() {
   const studyTarget = Math.round(goal.study * sel.days);
   const speakTarget = Math.round(goal.speak * sel.days);
 
-  // 1日の学習目標を達成した日。連続達成日数（ストリーク）もここから求める
-  const { achieved, streak } = useMemo(() => {
-    const set = new Set<string>();
+  // 1日の学習目標（当時の目標）を達成した日と連続達成日数
+  const restSet = useMemo(() => new Set(restDays), [restDays]);
+  const streak = useMemo(() => {
     const minutesOf: Record<string, number> = {};
     personalData.forEach((x) => {
       minutesOf[dateKey(x.date)] = x.studyMin;
-      if (studyGoal > 0 && x.studyMin >= studyGoal) set.add(dateKey(x.date));
     });
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayAchieved = set.has(dateKey(today));
-    let cur = todayAchieved ? new Date(today) : addDays(today, -1);
-    let current = 0;
-    while (set.has(dateKey(cur))) {
-      current++;
-      cur = addDays(cur, -1);
-    }
-    const days = [...set].sort();
-    let best = 0;
-    let run = 0;
-    let prev: string | null = null;
-    days.forEach((k) => {
-      run = prev && dateKey(addDays(new Date(prev + 'T00:00:00'), 1)) === k ? run + 1 : 1;
-      best = Math.max(best, run);
-      prev = k;
-    });
-    const info: StreakInfo = { current, best, todayAchieved, remainingMin: Math.max(0, studyGoal - (minutesOf[dateKey(today)] ?? 0)) };
-    return { achieved: set, streak: info };
-  }, [personalData, studyGoal]);
+    return computeStreak(minutesOf, goalHistory, restSet, new Date());
+  }, [personalData, goalHistory, restSet]);
+  const [restOpen, setRestOpen] = useState(false);
 
   const win = WINDOW[period];
   const canOlder = (offset[period] + 1) * win < totalBuckets;
@@ -262,11 +245,12 @@ export default function RecordsScreen() {
       {/* カレンダー */}
       <Text style={styles.sectionTitle}>カレンダー</Text>
       <View style={styles.calendarWrap}>
-        <StreakBanner streak={streak} />
+        <StreakBanner streak={streak} onOpenRest={() => setRestOpen(true)} />
         <CalendarGrid
           month={calMonth}
           entries={entries}
-          achieved={achieved}
+          achieved={streak.achieved}
+          restDays={restSet}
           onPrevMonth={() => setCalMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))}
           onNextMonth={() => setCalMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))}
           onSelectDay={openDaySheet}
@@ -295,6 +279,8 @@ export default function RecordsScreen() {
           </View>
         ))}
       </View>
+
+      <RestDaysModal visible={restOpen} onClose={() => setRestOpen(false)} />
 
       <DaySheet
         visible={sheetVisible}
