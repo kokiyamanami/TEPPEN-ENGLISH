@@ -127,10 +127,19 @@ router.get('/students', (req, res) => {
 router.post('/students', (req, res) => {
   const { name, email = '', phone = '', groupId = null, phase = 1 } = req.body || {};
   if (!name) return res.status(400).json({ error: 'name is required' });
-  const info = db
-    .prepare('INSERT INTO students (name, email, phone, group_id, phase, status, last_login) VALUES (?, ?, ?, ?, ?, ?, ?)')
-    .run(name, email, phone, groupId, phase, 'active', new Date().toISOString().slice(0, 10));
-  res.json({ id: info.lastInsertRowid });
+  // emailは UNIQUE 制約があるため、未入力時は空文字ではなくNULLで保存する
+  // （空文字だとSQLiteのUNIQUEが「同じ値」とみなし、2人目以降のメール未入力の生徒追加が失敗する）
+  try {
+    const info = db
+      .prepare('INSERT INTO students (name, email, phone, group_id, phase, status, last_login) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run(name, email.trim() || null, phone, groupId, phase, 'active', new Date().toISOString().slice(0, 10));
+    res.json({ id: info.lastInsertRowid });
+  } catch (err) {
+    if (String(err.message).includes('UNIQUE')) {
+      return res.status(409).json({ error: 'このメールアドレスは既に登録されています' });
+    }
+    throw err;
+  }
 });
 
 router.patch('/students/:id', (req, res) => {
@@ -183,15 +192,16 @@ router.post('/students/:id/phase', (req, res) => {
 
 router.post('/students/:id/monthly', (req, res) => {
   const { month, pass, date } = req.body || {};
+  const safeDate = date || new Date().toISOString().slice(0, 10);
   const existing = db.prepare('SELECT id FROM monthly_mission_results WHERE student_id = ? AND month = ?').get(req.params.id, month);
   if (existing) {
-    db.prepare('UPDATE monthly_mission_results SET pass = ?, date = ? WHERE id = ?').run(pass ? 1 : 0, date, existing.id);
+    db.prepare('UPDATE monthly_mission_results SET pass = ?, date = ? WHERE id = ?').run(pass ? 1 : 0, safeDate, existing.id);
   } else {
     db.prepare('INSERT INTO monthly_mission_results (student_id, month, pass, date) VALUES (?, ?, ?, ?)').run(
       req.params.id,
       month,
       pass ? 1 : 0,
-      date || new Date().toISOString().slice(0, 10)
+      safeDate
     );
   }
   res.json({ ok: true });

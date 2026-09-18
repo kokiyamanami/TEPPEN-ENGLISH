@@ -36,18 +36,29 @@ router.post('/signup', (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'email and password are required' });
 
-  const existing = db.prepare('SELECT id FROM students WHERE email = ?').get(email);
-  if (existing) return res.status(409).json({ error: 'このメールアドレスは既に登録されています' });
+  // 管理画面でメールアドレス付きの生徒レコードが先に作られている場合があるため、
+  // password_hash未設定（＝まだ本人がサインアップしていない）ならそのレコードを引き継ぐ
+  const existing = db.prepare('SELECT id, password_hash FROM students WHERE email = ?').get(email);
+  if (existing && existing.password_hash) return res.status(409).json({ error: 'このメールアドレスは既に登録されています' });
 
   const hash = bcrypt.hashSync(password, 10);
-  const info = db
-    .prepare('INSERT INTO students (name, email, password_hash, phase, status, last_login, profile_json) VALUES (?, ?, ?, 1, ?, ?, ?)')
-    .run('', email, hash, 'active', todayStr(), '{}');
-  const studentId = info.lastInsertRowid;
+  let studentId;
+  if (existing) {
+    db.prepare('UPDATE students SET password_hash = ?, status = ?, last_login = ? WHERE id = ?').run(hash, 'active', todayStr(), existing.id);
+    studentId = existing.id;
+  } else {
+    const info = db
+      .prepare('INSERT INTO students (name, email, password_hash, phase, status, last_login, profile_json) VALUES (?, ?, ?, 1, ?, ?, ?)')
+      .run('', email, hash, 'active', todayStr(), '{}');
+    studentId = info.lastInsertRowid;
+  }
 
-  DEFAULT_OFFICIAL_FOLDERS.forEach((name) => {
-    db.prepare('INSERT INTO phrase_folders (student_id, name, source) VALUES (?, ?, ?)').run(studentId, name, 'official');
-  });
+  const hasFolders = db.prepare('SELECT id FROM phrase_folders WHERE student_id = ? LIMIT 1').get(studentId);
+  if (!hasFolders) {
+    DEFAULT_OFFICIAL_FOLDERS.forEach((name) => {
+      db.prepare('INSERT INTO phrase_folders (student_id, name, source) VALUES (?, ?, ?)').run(studentId, name, 'official');
+    });
+  }
 
   const token = jwt.sign({ id: studentId }, JWT_SECRET, { expiresIn: '365d' });
   res.json({ token, studentId });
@@ -179,7 +190,14 @@ router.get('/records', (req, res) => {
 });
 
 router.post('/records', (req, res) => {
-  const { id, date, category = 'other', subcategories = [], minutes = 0, memo = '' } = req.body || {};
+  const body = req.body || {};
+  const id = body.id;
+  const date = body.date;
+  // 分割代入のデフォルト値はundefinedにしか効かないため、明示的にnull/undefinedをまとめて弾く
+  const category = body.category ?? 'other';
+  const subcategories = body.subcategories ?? [];
+  const minutes = body.minutes ?? 0;
+  const memo = body.memo ?? '';
   if (!date) return res.status(400).json({ error: 'date is required' });
   const speakMin = category === 'speaking' ? minutes : Math.round(minutes * 0.3);
 

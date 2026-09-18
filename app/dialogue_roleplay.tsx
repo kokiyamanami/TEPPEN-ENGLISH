@@ -128,9 +128,9 @@ export default function DialogueRoleplayScreen() {
                       <Ionicons name="mic-outline" size={12} color={colors.textPrimary} />
                       <Text style={styles.smallBtnText}>録り直す</Text>
                     </Pressable>
-                    <Pressable style={styles.smallBtn}>
-                      <Ionicons name="play" size={12} color={colors.textPrimary} />
-                      <Text style={styles.smallBtnText}>確認する</Text>
+                    <Pressable style={[styles.smallBtn, styles.smallBtnDisabled]} disabled>
+                      <Ionicons name="play" size={12} color={colors.textSecondary} />
+                      <Text style={[styles.smallBtnText, styles.smallBtnTextDisabled]}>確認する（準備中）</Text>
                     </Pressable>
                   </View>
                 </>
@@ -164,7 +164,9 @@ const styles = StyleSheet.create({
   doneBadgeText: { fontSize: 12, color: colors.textPrimary, fontWeight: '600' },
   secondRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
   smallBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingVertical: 4, paddingHorizontal: spacing.sm },
+  smallBtnDisabled: { opacity: 0.5 },
   smallBtnText: { fontSize: 11, color: colors.textPrimary, fontWeight: '600' },
+  smallBtnTextDisabled: { color: colors.textSecondary },
   finishBtn: { backgroundColor: colors.coral, borderRadius: radius.pill, marginHorizontal: spacing.lg, marginVertical: spacing.xl, paddingVertical: spacing.md, alignItems: 'center' },
   finishText: { color: colors.white, fontWeight: '700' },
 });

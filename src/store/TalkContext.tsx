@@ -25,14 +25,16 @@ export function TalkProvider({ children }: { children: ReactNode }) {
 
   const sendMessage = (key: string, text: string) => {
     const now = 'たった今';
+    let kind: TalkThread['kind'] | undefined;
     setThreads((prev) => {
       const thread = prev[key];
       if (!thread) return prev;
+      kind = thread.kind;
       const updated: TalkThread = { ...thread, messages: [...thread.messages, { from: 'me', text, time: now }] };
       return { ...prev, [key]: updated };
     });
 
-    if (threads[key]?.kind === 'ai') {
+    if (kind === 'ai') {
       setTimeout(() => {
         setThreads((prev) => {
           const thread = prev[key];

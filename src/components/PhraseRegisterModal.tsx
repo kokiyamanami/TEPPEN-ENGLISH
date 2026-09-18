@@ -89,7 +89,7 @@ export function PhraseRegisterModal() {
             </Pressable>
             <Pressable
               style={styles.confirmBtn}
-              onPress={() => folderId && text.trim() && confirmRegister(text.trim(), folderId)}
+              onPress={() => folderId !== null && text.trim() && confirmRegister(text.trim(), folderId)}
             >
               <Text style={styles.confirmText}>登録する</Text>
             </Pressable>

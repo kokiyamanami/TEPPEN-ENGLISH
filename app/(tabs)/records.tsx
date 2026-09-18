@@ -29,13 +29,6 @@ import { dateKey, formatMin, shortMd } from '../../src/utils/dateHelpers';
 
 type MobileRecord = { id: number; date: string; study_min: number; speak_min: number; category: string | null; subcategories: string[]; memo: string | null };
 
-function isoDate(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
 const PERIOD_LABEL: Record<RecordPeriod, string> = { day: '日別', week: '週別', month: '月別', all: '全期間' };
 const WINDOW: Record<RecordPeriod, number> = { day: 7, week: 6, month: Infinity, all: Infinity };
 
@@ -106,7 +99,7 @@ export default function RecordsScreen() {
     if (!sheetDate) return;
     await apiPost('/records', {
       id: entry.id,
-      date: isoDate(sheetDate),
+      date: dateKey(sheetDate),
       category: entry.category,
       subcategories: entry.subcategories,
       minutes: entry.minutes,

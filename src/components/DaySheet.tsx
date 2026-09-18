@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { STUDY_CATEGORIES, STUDY_SUBCATEGORIES, StudyLogEntry } from '../data/records';
 import { colors, radius, spacing } from '../theme/colors';
@@ -14,8 +14,8 @@ type Props = {
   entries: StudyLogEntry[];
   onChangeDate: (d: Date) => void;
   onCancel: () => void;
-  onSave: (entry: StudyLogEntry) => void;
-  onDelete: (id: number) => void;
+  onSave: (entry: StudyLogEntry) => Promise<void>;
+  onDelete: (id: number) => Promise<void>;
 };
 
 function label(d: Date | null) {
@@ -30,6 +30,7 @@ export function DaySheet({ visible, date, entries, onChangeDate, onCancel, onSav
   const insets = useSafeAreaInsets();
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -52,15 +53,34 @@ export function DaySheet({ visible, date, entries, onChangeDate, onCancel, onSav
     setForm(EMPTY_FORM);
   };
 
-  const save = () => {
-    onSave({
-      id: editingId ?? undefined,
-      category: form.category,
-      subcategories: form.subs.length ? form.subs : [STUDY_SUBCATEGORIES[0]],
-      minutes: Number(form.minutes) || 0,
-      memo: form.memo,
-    });
-    startNew();
+  const save = async () => {
+    setSaving(true);
+    try {
+      await onSave({
+        id: editingId ?? undefined,
+        category: form.category,
+        subcategories: form.subs.length ? form.subs : [STUDY_SUBCATEGORIES[0]],
+        minutes: Number(form.minutes) || 0,
+        memo: form.memo,
+      });
+      startNew();
+    } catch (e) {
+      Alert.alert('保存に失敗しました', 'サーバーに接続できませんでした。もう一度お試しください。');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const remove = async (id: number) => {
+    setSaving(true);
+    try {
+      await onDelete(id);
+      if (editingId === id) startNew();
+    } catch (e) {
+      Alert.alert('削除に失敗しました', 'サーバーに接続できませんでした。もう一度お試しください。');
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (!date) return null;
@@ -101,7 +121,8 @@ export function DaySheet({ visible, date, entries, onChangeDate, onCancel, onSav
                         <Text style={styles.entryMin}>{e.minutes}分</Text>
                         <Pressable
                           hitSlop={8}
-                          onPress={() => e.id !== undefined && onDelete(e.id)}
+                          disabled={saving}
+                          onPress={() => e.id !== undefined && remove(e.id)}
                           style={styles.entryDelete}
                         >
                           <Ionicons name="trash-outline" size={16} color={colors.danger} />
@@ -164,8 +185,8 @@ export function DaySheet({ visible, date, entries, onChangeDate, onCancel, onSav
                   <Text style={styles.cancelText}>閉じる</Text>
                 </Pressable>
               )}
-              <Pressable style={styles.confirmBtn} onPress={save}>
-                <Text style={styles.confirmText}>{editingId !== null ? '更新する' : '追加する'}</Text>
+              <Pressable style={styles.confirmBtn} onPress={save} disabled={saving}>
+                <Text style={styles.confirmText}>{saving ? '保存中…' : editingId !== null ? '更新する' : '追加する'}</Text>
               </Pressable>
             </View>
           </ScrollView>

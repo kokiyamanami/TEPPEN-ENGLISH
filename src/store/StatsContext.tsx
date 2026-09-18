@@ -22,6 +22,7 @@ export function StatsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (isAuthenticated) reload();
+    else setTotalStudyMinutes(0);
   }, [isAuthenticated]);
 
   return <StatsContext.Provider value={{ totalStudyMinutes, reload }}>{children}</StatsContext.Provider>;

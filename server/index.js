@@ -112,6 +112,12 @@ app.get('/api/tts/audio/:file', (req, res) => {
   fs.createReadStream(filePath).pipe(res);
 });
 
+// job/position等は複数選択で配列（[]の場合もある）で送られてくるため、プロンプト用の自然文に変換する
+function joinOrFallback(value, fallback) {
+  if (Array.isArray(value)) return value.length ? value.join('、') : fallback;
+  return value || fallback;
+}
+
 // POST /api/generate/dialogue { scene, profile } -> AI生成の会話文
 app.post('/api/generate/dialogue', async (req, res) => {
   const { scene = '', profile = {} } = req.body || {};
@@ -129,7 +135,7 @@ app.post('/api/generate/dialogue', async (req, res) => {
         },
         {
           role: 'user',
-          content: `シーン: ${scene}\nユーザーの職業: ${profile.job || '会社員'}\nユーザーの職位: ${profile.position || ''}\nユーザーの職業詳細: ${profile.jobDetail || ''}`,
+          content: `シーン: ${scene}\nユーザーの職業: ${joinOrFallback(profile.job, '会社員')}\nユーザーの職位: ${joinOrFallback(profile.position, '')}\nユーザーの職業詳細: ${profile.jobDetail || ''}`,
         },
       ],
     });
@@ -158,7 +164,7 @@ app.post('/api/generate/presentation', async (req, res) => {
         },
         {
           role: 'user',
-          content: `テーマ: ${topic || '四半期の振り返りと提案'}\nユーザーの職業: ${profile.job || '会社員'}\nユーザーの職位: ${profile.position || ''}\n性格: ${profile.personality || ''}`,
+          content: `テーマ: ${topic || '四半期の振り返りと提案'}\nユーザーの職業: ${joinOrFallback(profile.job, '会社員')}\nユーザーの職位: ${joinOrFallback(profile.position, '')}\n性格: ${profile.personality || ''}`,
         },
       ],
     });

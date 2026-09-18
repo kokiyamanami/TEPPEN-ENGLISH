@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AvatarPicker } from '../src/components/AvatarPicker';
 import { OnboardFieldInput } from '../src/components/OnboardFieldInput';
 import { TopBar } from '../src/components/TopBar';
@@ -17,9 +17,11 @@ export default function MyPageEditScreen() {
     setSaving(true);
     try {
       await saveProfile();
+      router.replace('/(tabs)/mypage');
+    } catch (e) {
+      Alert.alert('保存に失敗しました', 'サーバーに接続できませんでした。もう一度お試しください。');
     } finally {
       setSaving(false);
-      router.replace('/(tabs)/mypage');
     }
   };
 

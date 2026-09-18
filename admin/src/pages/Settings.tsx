@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 
 export default function Settings() {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const toast = useToast();
   const [name, setName] = useState(user?.name ?? '');
   const [notifyEmail, setNotifyEmail] = useState(user?.notifyEmail ?? true);
@@ -12,6 +12,7 @@ export default function Settings() {
   const save = async (e: FormEvent) => {
     e.preventDefault();
     await api.patch('/me', { name, notifyEmail });
+    updateUser({ name, notifyEmail });
     toast('設定を保存しました');
   };
 

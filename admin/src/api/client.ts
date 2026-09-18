@@ -15,9 +15,14 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     },
   });
   if (res.status === 401) {
+    const body = await res.json().catch(() => ({}));
+    // /loginへの401はログイン失敗の通常応答なので、セッション切れの強制リダイレクトはかけない
+    if (path === '/login') {
+      throw new Error(body.error || 'ログインに失敗しました');
+    }
     localStorage.removeItem('admin_token');
-    window.location.href = '/login';
-    throw new Error('unauthorized');
+    window.location.hash = '#/login';
+    throw new Error(body.error || 'unauthorized');
   }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));

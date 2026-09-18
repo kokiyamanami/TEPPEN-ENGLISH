@@ -1,5 +1,6 @@
-import { createContext, ReactNode, useContext, useState } from 'react';
+import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { apiGet, apiPatch, apiPost, uploadAvatar as uploadAvatarRequest } from '../api/mobileAuth';
+import { useSession } from './SessionContext';
 
 export type Profile = {
   name: string;
@@ -67,17 +68,27 @@ type ProfileContextValue = {
 const ProfileContext = createContext<ProfileContextValue | null>(null);
 
 export function ProfileProvider({ children }: { children: ReactNode }) {
+  const { isAuthenticated } = useSession();
   const [profile, setProfile] = useState<Profile>(emptyProfile);
   const [avatarUrl, setAvatarUrl] = useState('');
+
+  // ログアウト時は前のアカウントのプロフィールが残らないようクリアする
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setProfile(emptyProfile);
+      setAvatarUrl('');
+    }
+  }, [isAuthenticated]);
 
   const setField = <K extends keyof Profile>(field: K, value: Profile[K]) => {
     setProfile((prev) => ({ ...prev, [field]: value }));
   };
 
-  // ログイン直後・アプリ再起動時にサーバーから最新プロフィールとオンボーディング進捗を取得
+  // ログイン直後・アプリ再起動時にサーバーから最新プロフィールとオンボーディング進捗を取得。
+  // prevとマージせず常に上書きする（別アカウントへの切り替え時に前のユーザーのフィールドが残らないように）
   const loadProfile = async () => {
     const res = await apiGet<MeResponse>('/me');
-    setProfile((prev) => ({ ...prev, ...normalizeProfile(res.profile) }));
+    setProfile({ ...emptyProfile, ...normalizeProfile(res.profile) });
     setAvatarUrl(res.avatarUrl || '');
     return { onboardingStep: res.onboardingStep, onboardingComplete: res.onboardingComplete };
   };

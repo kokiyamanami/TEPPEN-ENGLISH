@@ -41,7 +41,12 @@ export function PhraseProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    if (isAuthenticated) load().catch(() => {});
+    if (isAuthenticated) {
+      load().catch(() => {});
+    } else {
+      setFolders([]);
+      setPhrases([]);
+    }
   }, [isAuthenticated]);
 
   const folderCount = (folderId: number) => phrases.filter((p) => p.folder_id === folderId).length;
@@ -59,9 +64,15 @@ export function PhraseProvider({ children }: { children: ReactNode }) {
   };
 
   const toggleLearned = async (id: number) => {
-    setPhrases((prev) => prev.map((p) => (p.id === id ? { ...p, learned: p.learned ? 0 : 1 } : p)));
-    const target = phrases.find((p) => p.id === id);
-    await apiPatch(`/phrases/${id}`, { learned: !target?.learned });
+    let nextLearned = 0;
+    setPhrases((prev) =>
+      prev.map((p) => {
+        if (p.id !== id) return p;
+        nextLearned = p.learned ? 0 : 1;
+        return { ...p, learned: nextLearned };
+      })
+    );
+    await apiPatch(`/phrases/${id}`, { learned: !!nextLearned });
   };
 
   const openRegister = (text: string, editable: boolean, folderId: number | null = null) => {
