@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const db = require('./db');
 const { todayStr } = require('./dateUtil');
-const { removeDeck } = require('./phraseDecks');
+const { removeDeck, syncDecks } = require('./phraseDecks');
 const { goalHistory, restDays, currentGoal } = require('./goals');
 
 const router = express.Router();
@@ -243,6 +243,7 @@ router.post('/students/:id/phase', (req, res) => {
     'INSERT INTO phase_history (student_id, phase, date, listening, accuracy, fluency, clarity) VALUES (?, ?, ?, ?, ?, ?, ?)'
   ).run(req.params.id, phase, date || todayStr(), listening, accuracy, fluency, clarity);
   db.prepare('UPDATE students SET phase = ? WHERE id = ?').run(phase, req.params.id);
+  syncDecks(req.params.id);
   res.json({ ok: true });
 });
 

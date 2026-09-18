@@ -15,8 +15,9 @@ function matchesProfile(deck, profile) {
 // 該当する教材のフォルダとフレーズを作り、教材側の追加・変更・削除を反映する（覚えた状態は保持）。
 // 一度配布した教材は、プロフィールやレベルが変わっても残す
 function syncDecks(studentId) {
-  const student = db.prepare('SELECT phase, profile_json FROM students WHERE id = ?').get(studentId);
-  if (!student) return;
+  const student = db.prepare('SELECT phase, profile_json, onboarding_complete FROM students WHERE id = ?').get(studentId);
+  // プロフィールが入力されるオンボーディング完了後に配布する
+  if (!student || !student.onboarding_complete) return;
   let profile = {};
   try {
     profile = JSON.parse(student.profile_json || '{}');
