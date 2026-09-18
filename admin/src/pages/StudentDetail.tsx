@@ -22,9 +22,12 @@ type StudentDetailData = {
   phaseHistory: { id: number; phase: number; date: string; listening: number; accuracy: number; fluency: number; clarity: number }[];
   unitSubmissions: { id: number; unit: number; submitted_at: string; status: string }[];
   chatMessages: { id: number; sender: string; text: string; time: string }[];
-  phrases: { id: number; text: string; folder_name: string }[];
+  phrases: { id: number; text: string; text_jp: string; learned_count: number; folder_name: string; source: 'curated' | 'official' | 'custom'; content_type: 'phrase' | 'word' }[];
+  phraseHistory: { id: number; text: string; text_jp: string; content_type: 'phrase' | 'word'; folder_name: string; mastered_at: string }[];
   goals: { current: { study: number; speak: number }; history: { from: string; study: number; speak: number }[]; restDays: string[] };
 };
+
+const SOURCE_LABEL = { curated: 'カスタマイズ教材', official: '運営提供', custom: 'マイフォルダ' } as const;
 
 export default function StudentDetail() {
   const { id } = useParams();
@@ -319,15 +322,48 @@ export default function StudentDetail() {
 
         {/* MYフレーズ */}
         <div>
-          <div className="section-title">MYフレーズ集</div>
+          <div className="section-title">MYフレーズ・単語</div>
           <div className="card">
-            {data.phrases.map((p) => (
-              <div key={p.id} style={{ marginBottom: 8 }}>
-                <div style={{ fontSize: 13 }}>{p.text}</div>
-                <span className="tag">{p.folder_name}</span>
-              </div>
-            ))}
-            {data.phrases.length === 0 && <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>登録なし</div>}
+            <div style={{ display: 'flex', gap: 16, marginBottom: 10, fontSize: 13 }}>
+              <span>
+                学習中 <b>{data.phrases.length}</b>
+              </span>
+              <span>
+                マスター済み（3回覚えた） <b>{data.phraseHistory.length}</b>
+                <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
+                  （フレーズ {data.phraseHistory.filter((h) => h.content_type === 'phrase').length} / 単語 {data.phraseHistory.filter((h) => h.content_type === 'word').length}）
+                </span>
+              </span>
+            </div>
+
+            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>学習中</div>
+            <div style={{ maxHeight: 260, overflowY: 'auto', marginBottom: 12 }}>
+              {data.phrases.map((p) => (
+                <div key={p.id} style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 13 }}>
+                    {p.text}
+                    {p.text_jp && <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>　{p.text_jp}</span>}
+                  </div>
+                  <span className="tag">{p.content_type === 'word' ? '単語' : 'フレーズ'}</span>{' '}
+                  <span className="tag">{SOURCE_LABEL[p.source]}</span> <span className="tag">{p.folder_name}</span>{' '}
+                  <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>覚えた {p.learned_count}/3回</span>
+                </div>
+              ))}
+              {data.phrases.length === 0 && <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>なし</div>}
+            </div>
+
+            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>覚えた履歴</div>
+            <div style={{ maxHeight: 200, overflowY: 'auto' }}>
+              {data.phraseHistory.map((h) => (
+                <div key={h.id} style={{ marginBottom: 6, fontSize: 13 }}>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>{h.mastered_at}　</span>
+                  {h.text}
+                  <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>　{h.text_jp}</span>{' '}
+                  <span className="tag">{h.content_type === 'word' ? '単語' : 'フレーズ'}</span>
+                </div>
+              ))}
+              {data.phraseHistory.length === 0 && <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>まだありません</div>}
+            </div>
           </div>
         </div>
       </div>

@@ -223,15 +223,18 @@ router.get('/students/:id', (req, res) => {
   const chatMessages = db.prepare(`SELECT * FROM chat_messages WHERE student_id = ? ORDER BY id ASC`).all(req.params.id);
   const phrases = db
     .prepare(
-      `SELECT p.id, p.text, p.text_jp, p.learned, f.name as folder_name FROM phrases p
-       LEFT JOIN phrase_folders f ON f.id = p.folder_id WHERE p.student_id = ?`
+      `SELECT p.id, p.text, p.text_jp, p.learned_count, f.name as folder_name, f.source, f.content_type FROM phrases p
+       LEFT JOIN phrase_folders f ON f.id = p.folder_id WHERE p.student_id = ? AND p.mastered_at IS NULL ORDER BY f.source, f.id, p.id`
     )
+    .all(req.params.id);
+  const phraseHistory = db
+    .prepare('SELECT id, text, text_jp, content_type, folder_name, mastered_at FROM phrase_history WHERE student_id = ? ORDER BY mastered_at DESC, id DESC')
     .all(req.params.id);
 
   const history = goalHistory(req.params.id);
   const goals = { current: currentGoal(history), history: [...history].reverse(), restDays: restDays(req.params.id).reverse().slice(0, 10) };
 
-  res.json({ student, speakingStats, monthlyMissions, phaseHistory, unitSubmissions, chatMessages, phrases, goals });
+  res.json({ student, speakingStats, monthlyMissions, phaseHistory, unitSubmissions, chatMessages, phrases, phraseHistory, goals });
 });
 
 router.post('/students/:id/phase', (req, res) => {
