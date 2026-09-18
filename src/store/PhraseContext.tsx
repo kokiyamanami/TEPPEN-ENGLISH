@@ -4,23 +4,25 @@ import { useSession } from './SessionContext';
 
 // curated=カスタマイズ教材（プロフィール連動）、official=運営提供（レベル別）、custom=マイフォルダ（自由に編集可）
 export type PhraseFolderSource = 'curated' | 'official' | 'custom';
-export type PhraseFolder = { id: number; name: string; source: PhraseFolderSource };
+export type PhraseContentType = 'phrase' | 'word';
+export type PhraseFolder = { id: number; name: string; source: PhraseFolderSource; content_type: PhraseContentType };
 export type Phrase = { id: number; folder_id: number; text: string; text_jp: string; learned: number };
 
-type RegisterState = { visible: boolean; text: string; textJP: string; editable: boolean; folderId: number | null; editId: number | null };
+type RegisterState = { visible: boolean; text: string; textJP: string; editable: boolean; folderId: number | null; editId: number | null; contentType: PhraseContentType };
 
 type PhraseContextValue = {
   folders: PhraseFolder[];
   phrases: Phrase[];
   reload: () => Promise<void>;
   folderCount: (folderId: number) => number;
-  addFolder: (name: string) => Promise<number>;
+  addFolder: (name: string, contentType?: PhraseContentType) => Promise<number>;
   deleteFolder: (id: number) => void;
   renameFolder: (id: number, name: string) => void;
   deletePhrase: (id: number) => void;
   toggleLearned: (id: number) => void;
   registerState: RegisterState;
-  openRegister: (text: string, editable: boolean, folderId?: number | null, textJP?: string) => void;
+  openRegister: (text: string, editable: boolean, folderId?: number | null, textJP?: string, contentType?: PhraseContentType) => void;
+  setRegisterType: (t: PhraseContentType) => void;
   openEdit: (phrase: Phrase) => void;
   closeRegister: () => void;
   confirmRegister: (text: string, folderId: number, textJP: string) => void;
@@ -39,6 +41,7 @@ export function PhraseProvider({ children }: { children: ReactNode }) {
     editable: true,
     folderId: null,
     editId: null,
+    contentType: 'phrase',
   });
 
   const load = async () => {
@@ -58,9 +61,9 @@ export function PhraseProvider({ children }: { children: ReactNode }) {
 
   const folderCount = (folderId: number) => phrases.filter((p) => p.folder_id === folderId).length;
 
-  const addFolder = async (name: string) => {
-    const res = await apiPost<{ id: number }>('/phrase-folders', { name });
-    setFolders((prev) => [...prev, { id: res.id, name, source: 'custom' }]);
+  const addFolder = async (name: string, contentType: PhraseContentType = 'phrase') => {
+    const res = await apiPost<{ id: number }>('/phrase-folders', { name, contentType });
+    setFolders((prev) => [...prev, { id: res.id, name, source: 'custom', content_type: contentType }]);
     return res.id;
   };
 
@@ -88,12 +91,22 @@ export function PhraseProvider({ children }: { children: ReactNode }) {
     await apiPatch(`/phrases/${id}`, { learned: !!nextLearned }).catch(() => load().catch(() => {}));
   };
 
-  const openRegister = (text: string, editable: boolean, folderId: number | null = null, textJP = '') => {
-    setRegisterState({ visible: true, text, textJP, editable, folderId: folderId ?? folders.find((f) => f.source === 'custom')?.id ?? null, editId: null });
+  const firstCustomFolder = (t: PhraseContentType) => folders.find((f) => f.source === 'custom' && f.content_type === t)?.id ?? null;
+
+  // 単語（スペースを含まない1語）は「単語」、それ以外は「フレーズ」を初期の区分にする
+  const openRegister = (text: string, editable: boolean, folderId: number | null = null, textJP = '', contentType?: PhraseContentType) => {
+    const type: PhraseContentType =
+      (folderId !== null ? folders.find((f) => f.id === folderId)?.content_type : undefined) ??
+      contentType ??
+      (text.trim() && !/\s/.test(text.trim()) ? 'word' : 'phrase');
+    setRegisterState({ visible: true, text, textJP, editable, folderId: folderId ?? firstCustomFolder(type), editId: null, contentType: type });
   };
 
+  const setRegisterType = (t: PhraseContentType) => setRegisterState((prev) => ({ ...prev, contentType: t, folderId: firstCustomFolder(t) }));
+
   const openEdit = (p: Phrase) => {
-    setRegisterState({ visible: true, text: p.text, textJP: p.text_jp, editable: true, folderId: p.folder_id, editId: p.id });
+    const type = folders.find((f) => f.id === p.folder_id)?.content_type ?? 'phrase';
+    setRegisterState({ visible: true, text: p.text, textJP: p.text_jp, editable: true, folderId: p.folder_id, editId: p.id, contentType: type });
   };
 
   const closeRegister = () => setRegisterState((prev) => ({ ...prev, visible: false }));
@@ -115,7 +128,7 @@ export function PhraseProvider({ children }: { children: ReactNode }) {
   };
 
   const value = useMemo(
-    () => ({ folders, phrases, reload: load, folderCount, addFolder, deleteFolder, renameFolder, deletePhrase, toggleLearned, registerState, openRegister, openEdit, closeRegister, confirmRegister }),
+    () => ({ folders, phrases, reload: load, folderCount, addFolder, deleteFolder, renameFolder, deletePhrase, toggleLearned, registerState, openRegister, setRegisterType, openEdit, closeRegister, confirmRegister }),
     [folders, phrases, registerState]
   );
 

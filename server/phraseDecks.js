@@ -11,13 +11,13 @@ function syncDecks(studentId) {
   const tx = db.transaction(() => {
     decks.forEach((deck) => {
       const applicable = deck.level === student.phase;
-      let folder = db.prepare('SELECT id, name, source FROM phrase_folders WHERE student_id = ? AND deck_id = ?').get(studentId, deck.id);
+      let folder = db.prepare('SELECT id, name, source, content_type FROM phrase_folders WHERE student_id = ? AND deck_id = ?').get(studentId, deck.id);
       if (!folder) {
         if (!applicable) return;
-        const info = db.prepare('INSERT INTO phrase_folders (student_id, name, source, deck_id) VALUES (?, ?, ?, ?)').run(studentId, deck.name, deck.kind, deck.id);
+        const info = db.prepare('INSERT INTO phrase_folders (student_id, name, source, deck_id, content_type) VALUES (?, ?, ?, ?, ?)').run(studentId, deck.name, deck.kind, deck.id, deck.content_type);
         folder = { id: info.lastInsertRowid, name: deck.name, source: deck.kind };
-      } else if (folder.name !== deck.name || folder.source !== deck.kind) {
-        db.prepare('UPDATE phrase_folders SET name = ?, source = ? WHERE id = ?').run(deck.name, deck.kind, folder.id);
+      } else if (folder.name !== deck.name || folder.source !== deck.kind || folder.content_type !== deck.content_type) {
+        db.prepare('UPDATE phrase_folders SET name = ?, source = ?, content_type = ? WHERE id = ?').run(deck.name, deck.kind, deck.content_type, folder.id);
       }
       const items = db.prepare('SELECT id, text, text_jp FROM phrase_deck_items WHERE deck_id = ? ORDER BY sort_order, id').all(deck.id);
       const owned = db.prepare('SELECT id, deck_item_id, text, text_jp FROM phrases WHERE student_id = ? AND folder_id = ?').all(studentId, folder.id);

@@ -12,7 +12,7 @@ const { createRateLimiter } = require('./rateLimit');
 const aiLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 30 });
 const { lookupDictionary } = require('./dictionary');
 const { syncDecks } = require('./phraseDecks');
-const { generateCurated } = require('./curated');
+const { generateCurated, isGenerating } = require('./curated');
 const { REST_LIMIT_PER_MONTH, goalHistory, restDays, currentGoal } = require('./goals');
 
 const router = express.Router();
@@ -28,6 +28,7 @@ const avatarUpload = multer({ dest: '/tmp/teppen-uploads/', limits: { fileSize: 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const DEFAULT_MY_FOLDER = 'マイフレーズ';
+const DEFAULT_MY_WORD_FOLDER = 'マイ単語';
 
 function requireAuth(req, res, next) {
   const header = req.headers.authorization || '';
@@ -68,7 +69,8 @@ router.post('/signup', (req, res) => {
 
   const hasFolders = db.prepare('SELECT id FROM phrase_folders WHERE student_id = ? LIMIT 1').get(studentId);
   if (!hasFolders) {
-    db.prepare('INSERT INTO phrase_folders (student_id, name, source) VALUES (?, ?, ?)').run(studentId, DEFAULT_MY_FOLDER, 'custom');
+    db.prepare('INSERT INTO phrase_folders (student_id, name, source, content_type) VALUES (?, ?, ?, ?)').run(studentId, DEFAULT_MY_FOLDER, 'custom', 'phrase');
+    db.prepare('INSERT INTO phrase_folders (student_id, name, source, content_type) VALUES (?, ?, ?, ?)').run(studentId, DEFAULT_MY_WORD_FOLDER, 'custom', 'word');
   }
 
   const token = jwt.sign({ id: studentId }, JWT_SECRET, { expiresIn: '365d' });
@@ -151,7 +153,7 @@ router.post('/onboarding-progress', (req, res) => {
 router.post('/onboarding-complete', (req, res) => {
   db.prepare("UPDATE students SET onboarding_complete = 1, onboarding_step = 'obdone' WHERE id = ?").run(req.studentId);
   syncDecks(req.studentId);
-  generateCurated(req.studentId, { force: true });
+  generateCurated(req.studentId);
   res.json({ ok: true });
 });
 
@@ -167,9 +169,6 @@ router.patch('/profile', (req, res) => {
     updated.name || student.name || '',
     req.studentId
   );
-  // プロフィールの職業・趣味などが変わったら、該当するカスタマイズ教材を配布する
-  syncDecks(req.studentId);
-  generateCurated(req.studentId);
   res.json({ ok: true });
 });
 
@@ -312,7 +311,11 @@ router.delete('/records/:id', (req, res) => {
 // ---- phrases / folders ----
 router.get('/phrase-folders', (req, res) => {
   syncDecks(req.studentId);
-  generateCurated(req.studentId); // 未生成なら作る（作成済みでプロフィール未変更なら何もしない）
+  generateCurated(req.studentId); // まだ無いカスタマイズ教材のフォルダだけ作る（既存は変更しない）
+  // 単語用のマイフォルダが無い生徒（フレーズ/単語の区分を追加する前からの生徒）には既定のものを作る
+  if (!db.prepare("SELECT id FROM phrase_folders WHERE student_id = ? AND source = 'custom' AND content_type = 'word' LIMIT 1").get(req.studentId)) {
+    db.prepare("INSERT INTO phrase_folders (student_id, name, source, content_type) VALUES (?, ?, 'custom', 'word')").run(req.studentId, DEFAULT_MY_WORD_FOLDER);
+  }
   res.json(db.prepare('SELECT * FROM phrase_folders WHERE student_id = ? ORDER BY id').all(req.studentId));
 });
 
@@ -338,6 +341,16 @@ router.delete('/phrase-folders/:id', (req, res) => {
   db.prepare('DELETE FROM phrases WHERE folder_id = ? AND student_id = ?').run(folder.id, req.studentId);
   db.prepare('DELETE FROM phrase_folders WHERE id = ?').run(folder.id);
   res.json({ ok: true });
+});
+
+// 「AIで新しく作る」: プロフィールを元に、カスタマイズ教材へ新しいフレーズ・単語を追加する（既存は消さない）
+router.post('/phrase-generate', async (req, res) => {
+  if (isGenerating(req.studentId)) return res.status(202).json({ status: 'busy' });
+  const started = generateCurated(req.studentId, { more: true });
+  const early = await Promise.race([started, new Promise((r) => setTimeout(() => r('started'), 50))]);
+  if (early === 'cooldown') return res.status(429).json({ error: 'cooldown' });
+  if (early === 'not_ready') return res.status(400).json({ error: 'onboarding_required' });
+  res.status(202).json({ status: 'started' });
 });
 
 router.get('/phrases', (req, res) => {

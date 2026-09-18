@@ -123,8 +123,10 @@ db.transaction(() => {
   }
 })();
 
+require('./seedWordDecks');
 db.prepare('SELECT id FROM students').all().forEach((s) => {
-  db.prepare("INSERT INTO phrase_folders (student_id, name, source) VALUES (?, 'マイフレーズ', 'custom')").run(s.id);
+  db.prepare("INSERT INTO phrase_folders (student_id, name, source, content_type) VALUES (?, 'マイフレーズ', 'custom', 'phrase')").run(s.id);
+  db.prepare("INSERT INTO phrase_folders (student_id, name, source, content_type) VALUES (?, 'マイ単語', 'custom', 'word')").run(s.id);
   syncDecks(s.id);
 });
 console.log('decks:', db.prepare('SELECT COUNT(*) c FROM phrase_decks').get().c, 'items:', db.prepare('SELECT COUNT(*) c FROM phrase_deck_items').get().c);

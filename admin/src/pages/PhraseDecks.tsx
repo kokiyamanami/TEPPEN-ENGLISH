@@ -7,13 +7,14 @@ type Deck = {
   id: number;
   name: string;
   level: number;
+  content_type: 'phrase' | 'word';
   item_count: number;
   student_count: number;
 };
 type Item = { id: number; text: string; text_jp: string };
 
-type Form = { id: number | null; name: string; level: number; itemsText: string };
-const EMPTY: Form = { id: null, name: '', level: 1, itemsText: '' };
+type Form = { id: number | null; name: string; level: number; contentType: 'phrase' | 'word'; itemsText: string };
+const EMPTY: Form = { id: null, name: '', level: 1, contentType: 'phrase', itemsText: '' };
 
 // 1行に「英語 | 日本語」の形式で入力する
 const toText = (items: Item[]) => items.map((i) => (i.text_jp ? `${i.text} | ${i.text_jp}` : i.text)).join('\n');
@@ -39,7 +40,7 @@ export default function PhraseDecks() {
 
   const openEdit = async (d: Deck) => {
     const items = await api.get<Item[]>(`/phrase-decks/${d.id}/items`);
-    setForm({ id: d.id, name: d.name, level: d.level, itemsText: toText(items) });
+    setForm({ id: d.id, name: d.name, level: d.level, contentType: d.content_type, itemsText: toText(items) });
   };
 
   const save = async (e: FormEvent) => {
@@ -47,7 +48,7 @@ export default function PhraseDecks() {
     if (!form) return;
     setSaving(true);
     try {
-      const body = { name: form.name, level: form.level };
+      const body = { name: form.name, level: form.level, contentType: form.contentType };
       const id = form.id ?? (await api.post<{ id: number }>('/phrase-decks', body)).id;
       if (form.id) await api.patch(`/phrase-decks/${form.id}`, body);
       await api.put(`/phrase-decks/${id}/items`, { items: parseText(form.itemsText) });
@@ -83,6 +84,7 @@ export default function PhraseDecks() {
       <table className="table">
         <thead>
           <tr>
+            <th>区分</th>
             <th>教材名</th>
             <th>対象レベル</th>
             <th>項目数</th>
@@ -93,6 +95,9 @@ export default function PhraseDecks() {
         <tbody>
           {decks.map((d) => (
             <tr key={d.id}>
+              <td>
+                <span className="tag">{d.content_type === 'word' ? '単語' : 'フレーズ'}</span>
+              </td>
               <td style={{ fontWeight: 600 }}>{d.name}</td>
               <td>Phase {d.level}</td>
               <td>{d.item_count}</td>
@@ -109,7 +114,7 @@ export default function PhraseDecks() {
           ))}
           {decks.length === 0 && (
             <tr>
-              <td colSpan={5}>教材がありません</td>
+              <td colSpan={6}>教材がありません</td>
             </tr>
           )}
         </tbody>
@@ -121,6 +126,11 @@ export default function PhraseDecks() {
             <div className="modal-title">{form.id ? '教材を編集' : '教材を追加'}</div>
             <label className="field-label">教材名（アプリのフォルダ名）</label>
             <input className="input" style={{ width: '100%' }} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+            <label className="field-label">区分（アプリの「フレーズ」「単語」タブ）</label>
+            <select className="input" style={{ width: '100%' }} value={form.contentType} onChange={(e) => setForm({ ...form, contentType: e.target.value as Form['contentType'] })}>
+              <option value="phrase">フレーズ</option>
+              <option value="word">単語</option>
+            </select>
             <label className="field-label">対象レベル（Phase）</label>
             <select className="input" style={{ width: '100%' }} value={form.level} onChange={(e) => setForm({ ...form, level: Number(e.target.value) })}>
               {[1, 2, 3, 4, 5].map((n) => (

@@ -7,8 +7,9 @@ import { useTopInset } from '../hooks/useTopInset';
 
 export function PhraseRegisterModal() {
   const topInset = useTopInset();
-  const { registerState, closeRegister, confirmRegister, folders, addFolder, deletePhrase } = usePhrases();
-  const myFolders = folders.filter((f) => f.source === 'custom');
+  const { registerState, closeRegister, confirmRegister, folders, addFolder, deletePhrase, setRegisterType } = usePhrases();
+  const type = registerState.contentType;
+  const myFolders = folders.filter((f) => f.source === 'custom' && f.content_type === type);
   const [text, setText] = useState('');
   const [textJP, setTextJP] = useState('');
   const [folderId, setFolderId] = useState<number | null>(null);
@@ -27,7 +28,7 @@ export function PhraseRegisterModal() {
 
   const confirmNewFolder = async () => {
     if (!newFolderName.trim()) return;
-    const id = await addFolder(newFolderName.trim());
+    const id = await addFolder(newFolderName.trim(), type);
     setFolderId(id);
     setShowNewFolder(false);
     setNewFolderName('');
@@ -45,7 +46,7 @@ export function PhraseRegisterModal() {
               multiline
               value={text}
               onChangeText={setText}
-              placeholder="英語のフレーズを入力・貼り付け"
+              placeholder={type === 'word' ? '英単語を入力' : '英語のフレーズを入力・貼り付け'}
               placeholderTextColor={colors.textSecondary}
             />
           ) : (
@@ -63,6 +64,15 @@ export function PhraseRegisterModal() {
             placeholderTextColor={colors.textSecondary}
           />
 
+          {registerState.editId === null && (
+            <View style={styles.typeRow}>
+              {(['phrase', 'word'] as const).map((t) => (
+                <Pressable key={t} style={[styles.typeBtn, type === t && styles.typeBtnSel]} onPress={() => setRegisterType(t)}>
+                  <Text style={[styles.typeText, type === t && styles.typeTextSel]}>{t === 'phrase' ? 'フレーズ' : '単語'}</Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
           <Text style={styles.label}>マイフォルダを選ぶ</Text>
           <View style={styles.chipRow}>
             {myFolders.map((f) => (
@@ -151,6 +161,11 @@ const styles = StyleSheet.create({
   newFolderInput: { flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: spacing.sm, fontSize: 13, color: colors.textPrimary },
   newFolderBtn: { backgroundColor: colors.coral, borderRadius: radius.sm, paddingHorizontal: spacing.md, alignItems: 'center', justifyContent: 'center' },
   newFolderBtnText: { color: colors.white, fontWeight: '700', fontSize: 12 },
+  typeRow: { flexDirection: 'row', gap: spacing.xs, marginTop: spacing.md },
+  typeBtn: { flex: 1, alignItems: 'center', paddingVertical: 6, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border },
+  typeBtnSel: { backgroundColor: colors.navy, borderColor: colors.navy },
+  typeText: { fontSize: 12, color: colors.textPrimary, fontWeight: '600' },
+  typeTextSel: { color: colors.white },
   deleteLink: { alignSelf: 'flex-start', marginTop: spacing.md },
   deleteLinkText: { color: colors.danger, fontSize: 12, fontWeight: '600' },
   rowBtn: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },

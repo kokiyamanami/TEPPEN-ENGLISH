@@ -414,7 +414,8 @@ function parseDeck(body) {
   const level = Number(body.level);
   if (!name) return { error: 'name is required' };
   if (!Number.isInteger(level) || level < 1 || level > 5) return { error: 'level must be 1-5' };
-  return { kind: 'official', name, level, attr: null, attr_value: null };
+  const contentType = body.contentType === 'word' ? 'word' : 'phrase';
+  return { kind: 'official', name, level, attr: null, attr_value: null, contentType };
 }
 
 router.get('/phrase-decks', (req, res) => {
@@ -432,14 +433,14 @@ router.get('/phrase-decks', (req, res) => {
 router.post('/phrase-decks', (req, res) => {
   const d = parseDeck(req.body || {});
   if (d.error) return res.status(400).json({ error: d.error });
-  const info = db.prepare('INSERT INTO phrase_decks (kind, name, level, attr, attr_value) VALUES (?, ?, ?, ?, ?)').run(d.kind, d.name, d.level, d.attr, d.attr_value);
+  const info = db.prepare('INSERT INTO phrase_decks (kind, name, level, attr, attr_value, content_type) VALUES (?, ?, ?, ?, ?, ?)').run(d.kind, d.name, d.level, d.attr, d.attr_value, d.contentType);
   res.json({ id: info.lastInsertRowid });
 });
 
 router.patch('/phrase-decks/:id', (req, res) => {
   const d = parseDeck(req.body || {});
   if (d.error) return res.status(400).json({ error: d.error });
-  db.prepare('UPDATE phrase_decks SET kind = ?, name = ?, level = ?, attr = ?, attr_value = ? WHERE id = ?').run(d.kind, d.name, d.level, d.attr, d.attr_value, req.params.id);
+  db.prepare('UPDATE phrase_decks SET kind = ?, name = ?, level = ?, attr = ?, attr_value = ?, content_type = ? WHERE id = ?').run(d.kind, d.name, d.level, d.attr, d.attr_value, d.contentType, req.params.id);
   res.json({ ok: true });
 });
 

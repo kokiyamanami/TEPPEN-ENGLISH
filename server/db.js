@@ -227,6 +227,13 @@ if (!studentCols.includes('curated_hash')) {
   db.exec('ALTER TABLE students ADD COLUMN curated_hash TEXT');
 }
 const phraseFolderCols = db.prepare('PRAGMA table_info(phrase_folders)').all().map((c) => c.name);
+if (!phraseFolderCols.includes('content_type')) {
+  db.exec("ALTER TABLE phrase_folders ADD COLUMN content_type TEXT NOT NULL DEFAULT 'phrase'");
+}
+const phraseDeckCols = db.prepare('PRAGMA table_info(phrase_decks)').all().map((c) => c.name);
+if (!phraseDeckCols.includes('content_type')) {
+  db.exec("ALTER TABLE phrase_decks ADD COLUMN content_type TEXT NOT NULL DEFAULT 'phrase'");
+}
 if (!phraseFolderCols.includes('deck_id')) {
   db.exec('ALTER TABLE phrase_folders ADD COLUMN deck_id INTEGER REFERENCES phrase_decks(id)');
 }
