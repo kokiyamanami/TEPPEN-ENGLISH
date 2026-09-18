@@ -5,9 +5,10 @@ import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'rea
 import { AdBanner } from '../../src/components/AdBanner';
 import { ScreenHeader } from '../../src/components/ScreenHeader';
 import { BACKEND_URL } from '../../src/config/api';
-import { MOCK_TOTAL_STUDY_MINUTES, getCurrentAltitudeM } from '../../src/data/mockHome';
+import { getCurrentAltitudeM } from '../../src/data/mockHome';
 import { useProfile } from '../../src/store/ProfileContext';
 import { useSession } from '../../src/store/SessionContext';
+import { useStats } from '../../src/store/StatsContext';
 import { colors, radius, spacing } from '../../src/theme/colors';
 
 const FIELD_ROWS: { key: keyof ReturnType<typeof useProfile>['profile']; label: string }[] = [
@@ -29,7 +30,8 @@ export default function MyPageScreen() {
   const { profile, avatarUrl, loadProfile } = useProfile();
   const { logout } = useSession();
   const [logoutOpen, setLogoutOpen] = useState(false);
-  const altitudeM = getCurrentAltitudeM(MOCK_TOTAL_STUDY_MINUTES);
+  const { totalStudyMinutes } = useStats();
+  const altitudeM = getCurrentAltitudeM(totalStudyMinutes);
 
   // オンボーディング直後など、コンテキストに古い/空のプロフィールが残っている場合に備えて
   // マイページ表示時に必ずサーバーの最新状態で上書きする

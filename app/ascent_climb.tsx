@@ -3,22 +3,20 @@ import { useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AscentScene } from '../src/components/AscentScene';
 import { BACKEND_URL } from '../src/config/api';
-import {
-  ASCENT_MILESTONES,
-  MOCK_TOTAL_STUDY_MINUTES,
-  getCurrentAltitudeM,
-  getNextMilestone,
-  getPrevMilestone,
-} from '../src/data/mockHome';
+import { ASCENT_MILESTONES, getCurrentAltitudeM, getNextMilestone, getPrevMilestone } from '../src/data/mockHome';
+import { useStats } from '../src/store/StatsContext';
 import { colors, radius, spacing } from '../src/theme/colors';
 
 // screen key: ascent_climb
 export default function AscentClimbScreen() {
   const [showRoute, setShowRoute] = useState(false);
-  const altitudeM = getCurrentAltitudeM(MOCK_TOTAL_STUDY_MINUTES);
+  const { totalStudyMinutes } = useStats();
+  const altitudeM = getCurrentAltitudeM(totalStudyMinutes);
   const next = getNextMilestone(altitudeM);
   const prev = getPrevMilestone(altitudeM);
   const remainMin = next ? Math.max(0, Math.round((next.altitudeM - altitudeM) * 60)) : 0;
+  const prevAltitude = prev?.altitudeM ?? 0;
+  const legProgress = next ? Math.min(1, Math.max(0, (altitudeM - prevAltitude) / (next.altitudeM - prevAltitude))) : 1;
 
   return (
     <View style={styles.screen}>
@@ -31,6 +29,14 @@ export default function AscentClimbScreen() {
               <Text style={styles.overlayUnit}>M</Text>
             </Text>
             <Text style={styles.overlayLabel}>{prev ? `${prev.name}を越えました` : 'まだ出発したばかり'}</Text>
+            {next && (
+              <View style={styles.progressWrap}>
+                <View style={styles.progressTrack}>
+                  <View style={[styles.progressFill, { width: `${Math.round(legProgress * 100)}%` }]} />
+                </View>
+                <Text style={styles.progressLabel}>次の「{next.name}」まで {Math.round(legProgress * 100)}%</Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -94,6 +100,10 @@ const styles = StyleSheet.create({
   overlayNum: { color: colors.white, fontSize: 40, fontWeight: '700' },
   overlayUnit: { fontSize: 16, fontWeight: '600' },
   overlayLabel: { color: colors.coralLight, fontSize: 13, marginTop: spacing.xs },
+  progressWrap: { marginTop: spacing.md, width: 160 },
+  progressTrack: { height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.25)', overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: 3, backgroundColor: colors.coral },
+  progressLabel: { color: colors.white, fontSize: 10, marginTop: spacing.xs, opacity: 0.85 },
   card: {
     margin: spacing.lg,
     backgroundColor: colors.white,

@@ -158,6 +158,12 @@ router.get('/ad-banners', (req, res) => {
   res.json(rows.map((r) => ({ id: r.id, imageUrl: r.image_url, linkUrl: r.link_url || '' })));
 });
 
+// ---- study summary（トレーニング画面の登頂標高に使う累計学習時間） ----
+router.get('/study-summary', (req, res) => {
+  const row = db.prepare('SELECT COALESCE(SUM(study_min), 0) as total FROM speaking_stats WHERE student_id = ?').get(req.studentId);
+  res.json({ totalStudyMinutes: row.total });
+});
+
 // ---- study records (records画面のカレンダー/グラフ用) ----
 // 1日に複数件の学習記録を登録できる（同じdateのstudent_id×日付は一意ではない）
 router.get('/records', (req, res) => {

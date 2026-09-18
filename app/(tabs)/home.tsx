@@ -4,11 +4,8 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AdBanner } from '../../src/components/AdBanner';
 import { RidgeMini } from '../../src/components/RidgeMini';
 import { ScreenHeader } from '../../src/components/ScreenHeader';
-import {
-  MOCK_TOTAL_STUDY_MINUTES,
-  getCurrentAltitudeM,
-  getNextMilestone,
-} from '../../src/data/mockHome';
+import { getCurrentAltitudeM, getNextMilestone } from '../../src/data/mockHome';
+import { useStats } from '../../src/store/StatsContext';
 import { colors, radius, spacing } from '../../src/theme/colors';
 
 const TILES: { key: string; label: string; icon: keyof typeof Ionicons.glyphMap; route: string }[] = [
@@ -19,7 +16,8 @@ const TILES: { key: string; label: string; icon: keyof typeof Ionicons.glyphMap;
 ];
 
 export default function HomeScreen() {
-  const altitudeM = getCurrentAltitudeM(MOCK_TOTAL_STUDY_MINUTES);
+  const { totalStudyMinutes } = useStats();
+  const altitudeM = getCurrentAltitudeM(totalStudyMinutes);
   const next = getNextMilestone(altitudeM);
   const remainingM = next ? next.altitudeM - altitudeM : 0;
   const remainingMinutes = remainingM * 60;

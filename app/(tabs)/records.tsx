@@ -23,6 +23,7 @@ import {
 } from '../../src/data/records';
 import { useGoals } from '../../src/store/GoalsContext';
 import { useProfile } from '../../src/store/ProfileContext';
+import { useStats } from '../../src/store/StatsContext';
 import { colors, radius, spacing } from '../../src/theme/colors';
 import { dateKey, formatMin, shortMd } from '../../src/utils/dateHelpers';
 
@@ -42,6 +43,7 @@ const WINDOW: Record<RecordPeriod, number> = { day: 7, week: 6, month: Infinity,
 export default function RecordsScreen() {
   const { profile } = useProfile();
   const { studyGoal, speakGoal } = useGoals();
+  const { reload: reloadStats } = useStats();
   const [scope, setScope] = useState<RecordScope>('personal');
   const [period, setPeriod] = useState<RecordPeriod>('day');
   const [offset, setOffset] = useState<Record<RecordPeriod, number>>({ day: 0, week: 0, month: 0, all: 0 });
@@ -111,11 +113,13 @@ export default function RecordsScreen() {
       memo: entry.memo,
     });
     loadRecords();
+    reloadStats();
   };
 
   const deleteEntry = async (id: number) => {
     await apiDelete(`/records/${id}`);
     loadRecords();
+    reloadStats();
   };
 
   // TODO: Daily/Weeklyミッション結果・フリー練習ログの永続化テーブルが未実装のためモックのまま

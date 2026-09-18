@@ -15,9 +15,6 @@ export const ASCENT_MILESTONES: Milestone[] = [
   { order: 10, name: 'エベレスト', altitudeM: 8848, image: '/milestones/10.png' },
 ];
 
-// TODO(Phase10): 実データ（累計学習時間）に置き換え
-export const MOCK_TOTAL_STUDY_MINUTES = 620;
-
 export function getCurrentAltitudeM(totalMinutes: number): number {
   return Math.round(totalMinutes / 60);
 }
