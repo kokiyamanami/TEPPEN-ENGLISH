@@ -355,7 +355,59 @@ router.post('/phrase-generate', async (req, res) => {
 
 router.get('/phrases', (req, res) => {
   syncDecks(req.studentId);
-  res.json(db.prepare('SELECT * FROM phrases WHERE student_id = ? ORDER BY id').all(req.studentId));
+  // 3回覚えたフレーズは一覧から外れ、履歴（/phrase-history）に移る
+  res.json(db.prepare('SELECT * FROM phrases WHERE student_id = ? AND mastered_at IS NULL ORDER BY id').all(req.studentId));
+});
+
+const MASTER_COUNT = 3;
+
+// 「覚えた」を1回記録する。同じ日に何度押しても1回まで。3回目で一覧から外れて履歴に入る
+router.post('/phrases/:id/learn', (req, res) => {
+  const p = db
+    .prepare(
+      `SELECT p.*, f.name as folder_name, f.content_type FROM phrases p JOIN phrase_folders f ON f.id = p.folder_id
+       WHERE p.id = ? AND p.student_id = ? AND p.mastered_at IS NULL`
+    )
+    .get(req.params.id, req.studentId);
+  if (!p) return res.status(404).json({ error: 'not_found' });
+  const today = isDate(req.body?.today) ? req.body.today : todayStr();
+  if (p.learned_on === today) return res.json({ learnedCount: p.learned_count, mastered: false, already: true });
+  const count = p.learned_count + 1;
+  if (count < MASTER_COUNT) {
+    db.prepare('UPDATE phrases SET learned_count = ?, learned = 1, learned_on = ? WHERE id = ?').run(count, today, p.id);
+    return res.json({ learnedCount: count, mastered: false, already: false });
+  }
+  db.transaction(() => {
+    db.prepare('UPDATE phrases SET learned_count = ?, learned = 1, learned_on = ?, mastered_at = ? WHERE id = ?').run(count, today, today, p.id);
+    db.prepare('INSERT INTO phrase_history (student_id, phrase_id, text, text_jp, content_type, folder_name, mastered_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
+      req.studentId, p.id, p.text, p.text_jp || '', p.content_type, p.folder_name, today
+    );
+  })();
+  res.json({ learnedCount: count, mastered: true, already: false });
+});
+
+router.get('/phrase-history', (req, res) => {
+  res.json(db.prepare('SELECT * FROM phrase_history WHERE student_id = ? ORDER BY mastered_at DESC, id DESC').all(req.studentId));
+});
+
+// 履歴から復習に戻す。元のフレーズが残っていればカウントをリセットして戻し、無ければマイフォルダに作り直す
+router.post('/phrase-history/:id/restore', (req, res) => {
+  const h = db.prepare('SELECT * FROM phrase_history WHERE id = ? AND student_id = ?').get(req.params.id, req.studentId);
+  if (!h) return res.status(404).json({ error: 'not_found' });
+  db.transaction(() => {
+    const p = h.phrase_id ? db.prepare('SELECT id FROM phrases WHERE id = ? AND student_id = ?').get(h.phrase_id, req.studentId) : null;
+    if (p) {
+      db.prepare('UPDATE phrases SET learned_count = 0, learned = 0, learned_on = NULL, mastered_at = NULL WHERE id = ?').run(p.id);
+    } else {
+      const folder = db
+        .prepare("SELECT id FROM phrase_folders WHERE student_id = ? AND source = 'custom' AND content_type = ? ORDER BY id LIMIT 1")
+        .get(req.studentId, h.content_type);
+      if (!folder) throw new Error('no_folder');
+      db.prepare('INSERT INTO phrases (student_id, folder_id, text, text_jp, learned) VALUES (?, ?, ?, ?, 0)').run(req.studentId, folder.id, h.text, h.text_jp);
+    }
+    db.prepare('DELETE FROM phrase_history WHERE id = ?').run(h.id);
+  })();
+  res.json({ ok: true });
 });
 
 router.post('/phrases', (req, res) => {

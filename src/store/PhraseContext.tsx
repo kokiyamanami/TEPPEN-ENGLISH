@@ -1,12 +1,14 @@
 import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react';
 import { apiDelete, apiGet, apiPatch, apiPost } from '../api/mobileAuth';
+import { dateKey } from '../utils/dateHelpers';
 import { useSession } from './SessionContext';
 
 // curated=カスタマイズ教材（プロフィール連動）、official=運営提供（レベル別）、custom=マイフォルダ（自由に編集可）
 export type PhraseFolderSource = 'curated' | 'official' | 'custom';
 export type PhraseContentType = 'phrase' | 'word';
 export type PhraseFolder = { id: number; name: string; source: PhraseFolderSource; content_type: PhraseContentType };
-export type Phrase = { id: number; folder_id: number; text: string; text_jp: string; learned: number };
+export type Phrase = { id: number; folder_id: number; text: string; text_jp: string; learned: number; learned_count: number; learned_on: string | null };
+export const MASTER_COUNT = 3;
 
 type RegisterState = { visible: boolean; text: string; textJP: string; editable: boolean; folderId: number | null; editId: number | null; contentType: PhraseContentType };
 
@@ -19,7 +21,7 @@ type PhraseContextValue = {
   deleteFolder: (id: number) => void;
   renameFolder: (id: number, name: string) => void;
   deletePhrase: (id: number) => void;
-  toggleLearned: (id: number) => void;
+  markLearned: (id: number) => Promise<{ mastered: boolean; already: boolean }>;
   registerState: RegisterState;
   openRegister: (text: string, editable: boolean, folderId?: number | null, textJP?: string, contentType?: PhraseContentType) => void;
   setRegisterType: (t: PhraseContentType) => void;
@@ -83,12 +85,12 @@ export function PhraseProvider({ children }: { children: ReactNode }) {
     await apiDelete(`/phrases/${id}`).catch(() => load().catch(() => {}));
   };
 
-  const toggleLearned = async (id: number) => {
-    const target = phrases.find((p) => p.id === id);
-    if (!target) return;
-    const nextLearned = target.learned ? 0 : 1;
-    setPhrases((prev) => prev.map((p) => (p.id === id ? { ...p, learned: nextLearned } : p)));
-    await apiPatch(`/phrases/${id}`, { learned: !!nextLearned }).catch(() => load().catch(() => {}));
+  // 「覚えた」を1回記録する（同じ日は1回まで）。3回目で一覧から外れて履歴に入る
+  const markLearned = async (id: number) => {
+    const res = await apiPost<{ learnedCount: number; mastered: boolean; already: boolean }>(`/phrases/${id}/learn`, { today: dateKey(new Date()) });
+    if (res.mastered) setPhrases((prev) => prev.filter((p) => p.id !== id));
+    else setPhrases((prev) => prev.map((p) => (p.id === id ? { ...p, learned: 1, learned_count: res.learnedCount, learned_on: dateKey(new Date()) } : p)));
+    return { mastered: res.mastered, already: res.already };
   };
 
   const firstCustomFolder = (t: PhraseContentType) => folders.find((f) => f.source === 'custom' && f.content_type === t)?.id ?? null;
@@ -120,7 +122,7 @@ export function PhraseProvider({ children }: { children: ReactNode }) {
         setPhrases((prev) => prev.map((p) => (p.id === editId ? { ...p, text, text_jp: textJP, folder_id: folderId } : p)));
       } else {
         const res = await apiPost<{ id: number }>('/phrases', { folderId, text, textJP });
-        setPhrases((prev) => [...prev, { id: res.id, folder_id: folderId, text, text_jp: textJP, learned: 0 }]);
+        setPhrases((prev) => [...prev, { id: res.id, folder_id: folderId, text, text_jp: textJP, learned: 0, learned_count: 0, learned_on: null }]);
       }
     } catch {
       // 登録に失敗した場合は一覧を変更しない（未捕捉のPromise rejectionを避ける）
@@ -128,7 +130,7 @@ export function PhraseProvider({ children }: { children: ReactNode }) {
   };
 
   const value = useMemo(
-    () => ({ folders, phrases, reload: load, folderCount, addFolder, deleteFolder, renameFolder, deletePhrase, toggleLearned, registerState, openRegister, setRegisterType, openEdit, closeRegister, confirmRegister }),
+    () => ({ folders, phrases, reload: load, folderCount, addFolder, deleteFolder, renameFolder, deletePhrase, markLearned, registerState, openRegister, setRegisterType, openEdit, closeRegister, confirmRegister }),
     [folders, phrases, registerState]
   );
 

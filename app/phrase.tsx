@@ -77,6 +77,12 @@ export default function PhraseScreen() {
         </Pressable>
       </View>
 
+      <Pressable style={styles.historyLink} onPress={() => router.push('/phrase_history' as never)}>
+        <Ionicons name="time-outline" size={14} color={colors.coral} />
+        <Text style={styles.historyLinkText}>覚えた履歴を見る（3回覚えたフレーズ・単語）</Text>
+        <Ionicons name="chevron-forward" size={12} color={colors.coral} />
+      </Pressable>
+
       <View style={styles.tabRow}>
         {(['phrase', 'word'] as const).map((t) => (
           <Pressable key={t} style={[styles.tabBtn, tab === t && styles.tabBtnSel]} onPress={() => setTab(t)}>
@@ -202,6 +208,8 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginHorizontal: spacing.lg, marginTop: spacing.lg },
   sectionTitle: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+  historyLink: { flexDirection: 'row', alignItems: 'center', gap: 4, marginHorizontal: spacing.lg, marginTop: spacing.sm },
+  historyLinkText: { flex: 1, color: colors.coral, fontSize: 12, fontWeight: '600' },
   tabRow: { flexDirection: 'row', marginHorizontal: spacing.lg, marginTop: spacing.md, backgroundColor: colors.white, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, padding: 3 },
   tabBtn: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: radius.pill },
   tabBtnSel: { backgroundColor: colors.navy },

@@ -1,18 +1,19 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useRef, useState } from 'react';
-import { NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Alert, NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { TopBar } from '../src/components/TopBar';
 import { TtsLineButton } from '../src/components/TtsLineButton';
-import { usePhrases } from '../src/store/PhraseContext';
+import { MASTER_COUNT, usePhrases } from '../src/store/PhraseContext';
 import { useProfile } from '../src/store/ProfileContext';
 import { colors, radius, spacing } from '../src/theme/colors';
+import { dateKey } from '../src/utils/dateHelpers';
 import { voiceForGender } from '../src/utils/ttsVoice';
 
 // screen key: phrase_folder
 export default function PhraseFolderScreen() {
   const { folderId } = useLocalSearchParams<{ folderId?: string }>();
-  const { folders, phrases, toggleLearned, openRegister, openEdit } = usePhrases();
+  const { folders, phrases, markLearned, openRegister, openEdit } = usePhrases();
   const { width } = useWindowDimensions();
   const pager = useRef<ScrollView>(null);
   const { profile } = useProfile();
@@ -22,6 +23,13 @@ export default function PhraseFolderScreen() {
 
   const [index, setIndex] = useState(0);
   const [showJP, setShowJP] = useState(false);
+
+  // 3回覚えたフレーズが一覧から外れたら、表示位置を合わせ直す
+  useEffect(() => {
+    const i = Math.min(index, Math.max(0, folderPhrases.length - 1));
+    if (i !== index) setIndex(i);
+    pager.current?.scrollTo({ x: i * width, animated: false });
+  }, [folderPhrases.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!folder) {
     return (
@@ -36,7 +44,7 @@ export default function PhraseFolderScreen() {
     return (
       <View style={styles.screen}>
         <TopBar title={folder.name} backRoute="/phrase" />
-        <Text style={styles.empty}>まだフレーズがありません</Text>
+        <Text style={styles.empty}>表示できるフレーズがありません。{'\n'}3回覚えたものは「覚えた履歴」に移動します。</Text>
         {folder.source === 'custom' && (
           <Pressable style={styles.addBtn} onPress={() => openRegister('', true, folder.id)}>
             <Ionicons name="add" size={14} color={colors.coral} />
@@ -49,6 +57,7 @@ export default function PhraseFolderScreen() {
 
   const safeIndex = Math.min(index, folderPhrases.length - 1);
   const current = folderPhrases[safeIndex];
+  const doneToday = current.learned_on === dateKey(new Date());
 
   const goTo = (i: number) => {
     setShowJP(false);
@@ -105,14 +114,27 @@ export default function PhraseFolderScreen() {
       </ScrollView>
       <Text style={styles.swipeHint}>← スワイプで前後のフレーズへ →</Text>
 
+      <View style={styles.dots}>
+        {Array.from({ length: MASTER_COUNT }, (_, i) => (
+          <View key={i} style={[styles.dotItem, i < current.learned_count && styles.dotDone]} />
+        ))}
+        <Text style={styles.dotsText}>
+          {current.learned_count}/{MASTER_COUNT}回　{MASTER_COUNT}回覚えると履歴に移ります
+        </Text>
+      </View>
       <Pressable
-        style={[styles.learnedBtn, !!current.learned && styles.learnedBtnDone]}
-        onPress={() => {
-          toggleLearned(current.id);
-          next();
+        style={[styles.learnedBtn, doneToday && styles.learnedBtnDone]}
+        onPress={async () => {
+          try {
+            const r = await markLearned(current.id);
+            if (r.mastered) Alert.alert('マスター！', `「${current.text}」を${MASTER_COUNT}回覚えました。履歴に移動しました。`);
+            else if (!r.already) next();
+          } catch {
+            Alert.alert('記録できませんでした', '通信状況を確認して、もう一度お試しください。');
+          }
         }}
       >
-        <Text style={[styles.learnedText, !!current.learned && styles.learnedTextDone]}>覚えた ✓</Text>
+        <Text style={styles.learnedText}>{doneToday ? '今日は覚えた済み ✓' : '覚えた ✓'}</Text>
       </Pressable>
 
       {folder.source === 'custom' && (
@@ -137,6 +159,10 @@ const styles = StyleSheet.create({
   jp: { fontSize: 13, color: colors.textSecondary, marginTop: spacing.md, textAlign: 'center' },
   rowBtns: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg },
   iconBtn: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+  dots: { flexDirection: 'row', alignItems: 'center', gap: 6, marginHorizontal: spacing.lg, marginBottom: spacing.sm },
+  dotItem: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.border, borderWidth: 1, borderColor: '#B8C4CE' },
+  dotDone: { backgroundColor: colors.success, borderColor: colors.success },
+  dotsText: { fontSize: 11, color: colors.textSecondary, marginLeft: 4 },
   learnedBtn: { marginHorizontal: spacing.lg, backgroundColor: colors.navy, borderRadius: radius.pill, paddingVertical: spacing.md, alignItems: 'center' },
   learnedBtnDone: { backgroundColor: colors.success },
   learnedText: { color: colors.white, fontWeight: '700' },
