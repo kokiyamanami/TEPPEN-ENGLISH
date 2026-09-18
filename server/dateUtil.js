@@ -19,4 +19,18 @@ function mondayOfStr(d = new Date()) {
   return x.toISOString().slice(0, 10);
 }
 
-module.exports = { jstDate, todayStr, mondayOfStr };
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// クライアントが送ってくる「今日」（端末のローカル日付）を検証して返す。
+// 端末のタイムゾーン差は最大±1日なので、サーバーの日付から1日を超えてずれた値・不正な日付は
+// 無視してサーバーの日付を使う（過去日を「今日」と偽って、お休み日や目標履歴を後出しで作るのを防ぐ）
+function clientToday(value, now = new Date()) {
+  const server = todayStr(now);
+  const v = String(value ?? '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return server;
+  const t = Date.parse(`${v}T00:00:00Z`);
+  if (Number.isNaN(t) || new Date(t).toISOString().slice(0, 10) !== v) return server;
+  return Math.abs(t - Date.parse(`${server}T00:00:00Z`)) <= DAY_MS ? v : server;
+}
+
+module.exports = { jstDate, todayStr, mondayOfStr, clientToday };

@@ -12,6 +12,10 @@ const adminRoutes = require('./adminRoutes');
 const mobileRoutes = require('./mobileRoutes');
 const { requireAuth } = mobileRoutes;
 const { recordMission } = require('./missions');
+const { createRateLimiter } = require('./rateLimit');
+
+// OpenAIを使うエンドポイントは1人あたり毎分30回まで
+const aiLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 30 });
 
 const app = express();
 app.use(cors());
@@ -39,7 +43,7 @@ app.get('/api/ranking', (req, res) => {
 
 // POST /api/grade
 // multipart/form-data: audio=<file>, taskLabel, promptEN, promptJP
-app.post('/api/grade', requireAuth, upload.single('audio'), async (req, res) => {
+app.post('/api/grade', requireAuth, aiLimiter, upload.single('audio'), async (req, res) => {
   const file = req.file;
   if (!file) return res.status(400).json({ error: 'audio file is required' });
 
@@ -89,7 +93,7 @@ app.post('/api/grade', requireAuth, upload.single('audio'), async (req, res) => 
 
 // POST /api/tts/prepare { text, voice } -> { url } (キャッシュ済みでなければOpenAI TTSで生成)
 const ALLOWED_VOICES = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
-app.post('/api/tts/prepare', requireAuth, async (req, res) => {
+app.post('/api/tts/prepare', requireAuth, aiLimiter, async (req, res) => {
   const { text, voice = 'alloy' } = req.body || {};
   if (!text || typeof text !== 'string') return res.status(400).json({ error: 'text is required' });
   const safeVoice = ALLOWED_VOICES.includes(voice) ? voice : 'alloy';
@@ -130,7 +134,7 @@ function joinOrFallback(value, fallback) {
 }
 
 // POST /api/generate/dialogue { scene, profile } -> AI生成の会話文
-app.post('/api/generate/dialogue', requireAuth, async (req, res) => {
+app.post('/api/generate/dialogue', requireAuth, aiLimiter, async (req, res) => {
   const scene = String(req.body?.scene ?? '').slice(0, 200);
   const profile = req.body?.profile && typeof req.body.profile === 'object' ? req.body.profile : {};
   try {
@@ -160,7 +164,7 @@ app.post('/api/generate/dialogue', requireAuth, async (req, res) => {
 });
 
 // POST /api/generate/presentation { profile, topic? } -> AI生成のプレゼン原稿（4段落）
-app.post('/api/generate/presentation', requireAuth, async (req, res) => {
+app.post('/api/generate/presentation', requireAuth, aiLimiter, async (req, res) => {
   const topic = String(req.body?.topic ?? '').slice(0, 200);
   const profile = req.body?.profile && typeof req.body.profile === 'object' ? req.body.profile : {};
   try {

@@ -2,6 +2,7 @@ import { createContext, ReactNode, useContext, useEffect, useState } from 'react
 import { apiGet } from '../api/mobileAuth';
 import { Lecture } from '../data/lectures';
 import { useLiveRefresh } from '../hooks/useLiveRefresh';
+import { useSession } from './SessionContext';
 
 type LectureContextValue = {
   lectures: Lecture[];
@@ -14,6 +15,7 @@ type LectureContextValue = {
 const LectureContext = createContext<LectureContextValue | null>(null);
 
 export function LectureProvider({ children }: { children: ReactNode }) {
+  const { isAuthenticated } = useSession();
   const [lectures, setLectures] = useState<Lecture[]>([]);
   const [loading, setLoading] = useState(true);
   const [watchedIds, setWatchedIds] = useState<Set<string>>(new Set());
@@ -29,9 +31,12 @@ export function LectureProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false));
   };
 
+  // 未ログインの間は取得が401になるため、ログイン（またはセッション復元）後に取得し直す。
+  // ログアウト時は前のアカウントの視聴済み表示が残らないようクリアする
   useEffect(() => {
-    reload();
-  }, []);
+    if (isAuthenticated) reload();
+    else setWatchedIds(new Set());
+  }, [isAuthenticated]);
 
   useLiveRefresh(() => reload(true));
 
