@@ -1,7 +1,9 @@
 import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
 import { api, BACKEND_URL, uploadFile } from '../api/client';
 import { Modal } from '../components/Modal';
+import { Pagination } from '../components/Pagination';
 import { useToast } from '../context/ToastContext';
+import { usePagination } from '../hooks/usePagination';
 
 function resolveUrl(url: string) {
   return url.startsWith('http') ? url : `${BACKEND_URL}${url}`;
@@ -37,7 +39,8 @@ export default function AdBanners() {
   const [placement, setPlacement] = useState<Placement>('home');
   const [sortOrder, setSortOrder] = useState('0');
 
-  const visibleAds = filter === 'all' ? ads : ads.filter((a) => a.placement === filter);
+  const filteredAds = filter === 'all' ? ads : ads.filter((a) => a.placement === filter);
+  const { page, setPage, totalPages, pageItems: visibleAds, total } = usePagination(filteredAds);
 
   const load = () => api.get<AdBanner[]>('/ads').then(setAds);
 
@@ -176,21 +179,24 @@ export default function AdBanners() {
               <td>
                 <span className="tag">{ad.enabled ? '表示中' : '非表示'}</span>
               </td>
-              <td style={{ display: 'flex', gap: 8 }}>
-                <button className="btn" style={{ padding: '4px 12px' }} onClick={() => openEdit(ad)}>
-                  編集
-                </button>
-                <button className="btn" style={{ padding: '4px 12px' }} onClick={() => toggleEnabled(ad)}>
-                  {ad.enabled ? '非表示にする' : '表示する'}
-                </button>
-                <button className="btn" style={{ padding: '4px 12px' }} onClick={() => remove(ad)}>
-                  削除
-                </button>
+              <td>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn" style={{ padding: '4px 12px' }} onClick={() => openEdit(ad)}>
+                    編集
+                  </button>
+                  <button className="btn" style={{ padding: '4px 12px' }} onClick={() => toggleEnabled(ad)}>
+                    {ad.enabled ? '非表示にする' : '表示する'}
+                  </button>
+                  <button className="btn" style={{ padding: '4px 12px' }} onClick={() => remove(ad)}>
+                    削除
+                  </button>
+                </div>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+      <Pagination page={page} totalPages={totalPages} total={total} onChange={setPage} />
 
       {showEdit && (
         <Modal onClose={() => setShowEdit(null)}>

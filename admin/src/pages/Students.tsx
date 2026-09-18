@@ -3,7 +3,9 @@ import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { Avatar } from '../components/Avatar';
 import { Modal } from '../components/Modal';
+import { Pagination } from '../components/Pagination';
 import { useToast } from '../context/ToastContext';
+import { usePagination } from '../hooks/usePagination';
 
 type Student = {
   id: number;
@@ -22,6 +24,7 @@ type Group = { id: number; name: string };
 export default function Students() {
   const toast = useToast();
   const [students, setStudents] = useState<Student[]>([]);
+  const { page, setPage, totalPages, pageItems, total } = usePagination(students);
   const [groups, setGroups] = useState<Group[]>([]);
   const [search, setSearch] = useState('');
   const [groupFilter, setGroupFilter] = useState('');
@@ -101,7 +104,7 @@ export default function Students() {
           </tr>
         </thead>
         <tbody>
-          {students.map((s) => {
+          {pageItems.map((s) => {
             const latest = s.monthlyMissions[0];
             return (
               <tr key={s.id}>
@@ -140,6 +143,7 @@ export default function Students() {
           })}
         </tbody>
       </table>
+      <Pagination page={page} totalPages={totalPages} total={total} onChange={setPage} />
 
       {popupStudent && (
         <Modal onClose={() => setPopupStudent(null)}>

@@ -143,13 +143,18 @@ router.post('/students', (req, res) => {
 });
 
 router.patch('/students/:id', (req, res) => {
-  const { status, name, email, phone, groupId } = req.body || {};
+  const body = req.body || {};
+  const { status, name, email, phone } = body;
   db.prepare(
     `UPDATE students SET
-      status = COALESCE(?, status), name = COALESCE(?, name), email = COALESCE(?, email),
-      phone = COALESCE(?, phone), group_id = COALESCE(?, group_id)
+      status = COALESCE(?, status), name = COALESCE(?, name), email = COALESCE(?, email), phone = COALESCE(?, phone)
      WHERE id = ?`
-  ).run(status ?? null, name ?? null, email ?? null, phone ?? null, groupId ?? null, req.params.id);
+  ).run(status ?? null, name ?? null, email ?? null, phone ?? null, req.params.id);
+  // groupIdはグループ解除（null）を明示的に送るケースがあるため、COALESCEではなく
+  // リクエストにフィールドが含まれているかどうかで判定する
+  if (Object.prototype.hasOwnProperty.call(body, 'groupId')) {
+    db.prepare('UPDATE students SET group_id = ? WHERE id = ?').run(body.groupId, req.params.id);
+  }
   res.json({ ok: true });
 });
 
@@ -264,7 +269,9 @@ router.get('/groups/:id', (req, res) => {
   const group = db.prepare('SELECT * FROM groups WHERE id = ?').get(req.params.id);
   if (!group) return res.status(404).json({ error: 'not_found' });
 
-  const members = db.prepare('SELECT * FROM students WHERE group_id = ? ORDER BY name').all(req.params.id);
+  const members = db
+    .prepare('SELECT id, name, avatar_url, phase, status FROM students WHERE group_id = ? ORDER BY name')
+    .all(req.params.id);
   const memberIds = members.map((m) => m.id);
 
   let dailyStats = [];

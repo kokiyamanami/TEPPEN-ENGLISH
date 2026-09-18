@@ -207,6 +207,7 @@ select {
 .table td {
   padding: 10px 14px;
   border-bottom: 1px solid var(--border);
+  vertical-align: middle;
 }
 
 .table tr:last-child td {
@@ -215,6 +216,32 @@ select {
 
 .table tr:hover td {
   background: rgba(232, 130, 95, 0.04);
+}
+
+.pagination-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+  padding: 0 2px;
+}
+
+.pagination-info {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pagination-page {
+  font-size: 12px;
+  color: var(--text-secondary);
+  min-width: 48px;
+  text-align: center;
 }
 
 .tag {

@@ -1,13 +1,16 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { Modal } from '../components/Modal';
+import { Pagination } from '../components/Pagination';
 import { useToast } from '../context/ToastContext';
+import { usePagination } from '../hooks/usePagination';
 
 type Material = { id: number; title: string; week: string; status: string };
 
 export default function Materials() {
   const toast = useToast();
   const [materials, setMaterials] = useState<Material[]>([]);
+  const { page, setPage, totalPages, pageItems, total } = usePagination(materials);
   const [showCreate, setShowCreate] = useState(false);
   const [title, setTitle] = useState('');
   const [week, setWeek] = useState('');
@@ -54,7 +57,7 @@ export default function Materials() {
           </tr>
         </thead>
         <tbody>
-          {materials.map((m) => (
+          {pageItems.map((m) => (
             <tr key={m.id}>
               <td style={{ fontWeight: 600 }}>{m.title}</td>
               <td>{m.week}</td>
@@ -70,6 +73,7 @@ export default function Materials() {
           ))}
         </tbody>
       </table>
+      <Pagination page={page} totalPages={totalPages} total={total} onChange={setPage} />
 
       {showCreate && (
         <Modal onClose={() => setShowCreate(false)}>

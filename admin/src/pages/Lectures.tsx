@@ -1,7 +1,9 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { Modal } from '../components/Modal';
+import { Pagination } from '../components/Pagination';
 import { useToast } from '../context/ToastContext';
+import { usePagination } from '../hooks/usePagination';
 
 type Lecture = {
   id: number;
@@ -39,6 +41,7 @@ function extractYoutubeId(input: string): string {
 export default function Lectures() {
   const toast = useToast();
   const [lectures, setLectures] = useState<Lecture[]>([]);
+  const { page, setPage, totalPages, pageItems, total } = usePagination(lectures);
   const [showEdit, setShowEdit] = useState<Lecture | 'new' | null>(null);
   const [youtubeId, setYoutubeId] = useState('');
   const [title, setTitle] = useState('');
@@ -114,7 +117,7 @@ export default function Lectures() {
           </tr>
         </thead>
         <tbody>
-          {lectures.map((l) => (
+          {pageItems.map((l) => (
             <tr key={l.id}>
               <td>
                 <img src={thumbnailUrl(l.youtube_id)} alt={l.title} style={{ width: 96, height: 54, objectFit: 'cover', borderRadius: 6 }} />
@@ -124,18 +127,21 @@ export default function Lectures() {
                 <span className="tag">{l.category || '未分類'}</span>
               </td>
               <td>{l.sort_order}</td>
-              <td style={{ display: 'flex', gap: 8 }}>
-                <button className="btn" style={{ padding: '4px 12px' }} onClick={() => openEdit(l)}>
-                  編集
-                </button>
-                <button className="btn" style={{ padding: '4px 12px' }} onClick={() => remove(l)}>
-                  削除
-                </button>
+              <td>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn" style={{ padding: '4px 12px' }} onClick={() => openEdit(l)}>
+                    編集
+                  </button>
+                  <button className="btn" style={{ padding: '4px 12px' }} onClick={() => remove(l)}>
+                    削除
+                  </button>
+                </div>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+      <Pagination page={page} totalPages={totalPages} total={total} onChange={setPage} />
 
       {showEdit && (
         <Modal onClose={() => setShowEdit(null)}>

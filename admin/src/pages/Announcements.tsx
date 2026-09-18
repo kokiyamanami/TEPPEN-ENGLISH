@@ -1,13 +1,16 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { Modal } from '../components/Modal';
+import { Pagination } from '../components/Pagination';
 import { useToast } from '../context/ToastContext';
+import { usePagination } from '../hooks/usePagination';
 
 type Announcement = { id: number; title: string; body: string; target: string; status: string; created_at: string };
 
 export default function Announcements() {
   const toast = useToast();
   const [items, setItems] = useState<Announcement[]>([]);
+  const { page, setPage, totalPages, pageItems, total } = usePagination(items);
   const [showCreate, setShowCreate] = useState(false);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
@@ -56,7 +59,7 @@ export default function Announcements() {
           </tr>
         </thead>
         <tbody>
-          {items.map((a) => (
+          {pageItems.map((a) => (
             <tr key={a.id}>
               <td style={{ fontWeight: 600 }}>{a.title}</td>
               <td>{a.target}</td>
@@ -73,6 +76,7 @@ export default function Announcements() {
           ))}
         </tbody>
       </table>
+      <Pagination page={page} totalPages={totalPages} total={total} onChange={setPage} />
 
       {showCreate && (
         <Modal onClose={() => setShowCreate(false)}>
