@@ -8,6 +8,7 @@ const db = require('./db');
 const { todayStr } = require('./dateUtil');
 const { removeDeck, syncDecks } = require('./phraseDecks');
 const { goalHistory, restDays, currentGoal } = require('./goals');
+const { createRateLimiter } = require('./rateLimit');
 
 const router = express.Router();
 if (!process.env.ADMIN_JWT_SECRET && process.env.NODE_ENV === 'production') {
@@ -19,33 +20,76 @@ const AD_IMAGE_DIR = path.join(__dirname, 'public', 'ads');
 fs.mkdirSync(AD_IMAGE_DIR, { recursive: true });
 const adImageUpload = multer({ dest: '/tmp/teppen-uploads/', limits: { fileSize: 10 * 1024 * 1024 } });
 
+const MIN_PASSWORD_LENGTH = 10;
+const KNOWN_DEFAULT_PASSWORD = 'teppen2026';
+const ROLES = ['admin', 'coach'];
+// 初期パスワードのまま（変更を強制されている）アカウントが、パスワード変更のために使える操作
+const PASSWORD_CHANGE_EXEMPT = new Set(['GET /me', 'POST /me/password']);
+const DUMMY_HASH = bcrypt.hashSync('dummy-password-for-timing', 10);
+
+// 総当たり対策: 同じIP×メールアドレスからのログイン試行は15分に10回まで
+const loginLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  keyFn: (req) => `${req.ip}|${String(req.body?.email || '').trim().toLowerCase()}`,
+});
+
+// トークンが有効でも、アカウントが削除されていれば拒否する。役割はトークンではなくDBの最新値を使う
+// （役割を変更・剥奪したときに、発行済みトークンが古い権限のまま使えてしまうのを防ぐ）
 function requireAuth(req, res, next) {
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : null;
   if (!token) return res.status(401).json({ error: 'unauthorized' });
+  let payload;
   try {
-    req.admin = jwt.verify(token, JWT_SECRET);
-    next();
+    payload = jwt.verify(token, JWT_SECRET);
   } catch (e) {
-    res.status(401).json({ error: 'unauthorized' });
+    return res.status(401).json({ error: 'unauthorized' });
   }
+  const user = db.prepare('SELECT id, email, name, role, must_change_password FROM admin_users WHERE id = ?').get(payload.id);
+  if (!user) return res.status(401).json({ error: 'unauthorized' });
+  req.admin = { id: user.id, email: user.email, name: user.name, role: user.role };
+  if (user.must_change_password && !PASSWORD_CHANGE_EXEMPT.has(`${req.method} ${req.path}`)) {
+    return res.status(403).json({ error: 'password_change_required' });
+  }
+  next();
 }
 
+// 役割ごとにできる操作:
+//   admin（運営管理者）: すべて
+//   coach（コーチ）    : 生徒・グループの運用（生徒の追加/編集、Phase・Monthly・ユニット承認、チャット、グループの作成/編集/目標）と、すべての閲覧
+//   admin だけ         : コーチ管理、教材・フレーズ教材・お知らせ・動画・広告の編集、生徒の一括登録/一括ステータス変更、グループ削除、スタッフ管理
+function requireAdmin(req, res, next) {
+  if (req.admin?.role !== 'admin') return res.status(403).json({ error: 'forbidden' });
+  next();
+}
+
+const userPayload = (user) => ({
+  id: user.id,
+  name: user.name,
+  email: user.email,
+  role: user.role,
+  notifyEmail: !!user.notify_email,
+  mustChangePassword: !!user.must_change_password,
+});
+
 // ---- auth ----
-router.post('/login', (req, res) => {
+router.post('/login', loginLimiter, (req, res) => {
   const { email, password } = req.body || {};
-  const user = db.prepare('SELECT * FROM admin_users WHERE email = ?').get(email);
-  if (!user || !bcrypt.compareSync(password || '', user.password_hash)) {
+  const user = typeof email === 'string' ? db.prepare('SELECT * FROM admin_users WHERE lower(email) = ?').get(email.trim().toLowerCase()) : null;
+  // ユーザーが存在しない場合も同じ時間だけ照合して、メールアドレスの存在を時間差で推測されにくくする
+  const ok = bcrypt.compareSync(typeof password === 'string' ? password : '', user ? user.password_hash : DUMMY_HASH);
+  if (!user || !ok) {
     return res.status(401).json({ error: 'メールアドレスまたはパスワードが正しくありません' });
   }
-  const token = jwt.sign({ id: user.id, email: user.email, name: user.name, role: user.role }, JWT_SECRET, { expiresIn: '30d' });
-  res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, notifyEmail: !!user.notify_email } });
+  const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '30d' });
+  res.json({ token, user: userPayload(user) });
 });
 
 router.get('/me', requireAuth, (req, res) => {
   const user = db.prepare('SELECT * FROM admin_users WHERE id = ?').get(req.admin.id);
   if (!user) return res.status(404).json({ error: 'not_found' });
-  res.json({ id: user.id, name: user.name, email: user.email, role: user.role, notifyEmail: !!user.notify_email });
+  res.json(userPayload(user));
 });
 
 router.patch('/me', requireAuth, (req, res) => {
@@ -59,7 +103,90 @@ router.patch('/me', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+function validateNewPassword(password) {
+  if (typeof password !== 'string' || password.length < MIN_PASSWORD_LENGTH) return `パスワードは${MIN_PASSWORD_LENGTH}文字以上にしてください`;
+  if (password === KNOWN_DEFAULT_PASSWORD) return 'このパスワードは使用できません';
+  return null;
+}
+
+router.post('/me/password', requireAuth, (req, res) => {
+  const { currentPassword, newPassword } = req.body || {};
+  const user = db.prepare('SELECT * FROM admin_users WHERE id = ?').get(req.admin.id);
+  if (!user || !bcrypt.compareSync(typeof currentPassword === 'string' ? currentPassword : '', user.password_hash)) {
+    return res.status(400).json({ error: '現在のパスワードが正しくありません' });
+  }
+  const invalid = validateNewPassword(newPassword);
+  if (invalid) return res.status(400).json({ error: invalid });
+  if (newPassword === currentPassword) return res.status(400).json({ error: '現在と異なるパスワードにしてください' });
+  db.prepare('UPDATE admin_users SET password_hash = ?, must_change_password = 0 WHERE id = ?').run(bcrypt.hashSync(newPassword, 10), user.id);
+  res.json({ ok: true });
+});
+
 router.use(requireAuth);
+
+// ---- staff（管理画面にログインするスタッフのアカウント。運営管理者のみ） ----
+router.get('/staff', requireAdmin, (req, res) => {
+  res.json(db.prepare('SELECT * FROM admin_users ORDER BY id').all().map(userPayload));
+});
+
+router.post('/staff', requireAdmin, (req, res) => {
+  const { name, email, role = 'coach', password } = req.body || {};
+  if (typeof name !== 'string' || !name.trim()) return res.status(400).json({ error: 'name is required' });
+  if (typeof email !== 'string' || !/^\S+@\S+\.\S+$/.test(email.trim())) return res.status(400).json({ error: 'メールアドレスを正しく入力してください' });
+  if (!ROLES.includes(role)) return res.status(400).json({ error: 'invalid role' });
+  const invalid = validateNewPassword(password);
+  if (invalid) return res.status(400).json({ error: invalid });
+  try {
+    // 発行した初期パスワードは、本人が初回ログイン時に必ず変更する
+    const info = db
+      .prepare('INSERT INTO admin_users (name, email, password_hash, role, notify_email, must_change_password) VALUES (?, ?, ?, ?, 1, 1)')
+      .run(name.trim(), email.trim().toLowerCase(), bcrypt.hashSync(password, 10), role);
+    res.json({ id: info.lastInsertRowid });
+  } catch (err) {
+    if (String(err.message).includes('UNIQUE')) return res.status(409).json({ error: 'このメールアドレスは既に登録されています' });
+    throw err;
+  }
+});
+
+function adminCount() {
+  return db.prepare("SELECT COUNT(*) c FROM admin_users WHERE role = 'admin'").get().c;
+}
+
+router.patch('/staff/:id', requireAdmin, (req, res) => {
+  const target = db.prepare('SELECT * FROM admin_users WHERE id = ?').get(req.params.id);
+  if (!target) return res.status(404).json({ error: 'not_found' });
+  const { name, role } = req.body || {};
+  if (role !== undefined && !ROLES.includes(role)) return res.status(400).json({ error: 'invalid role' });
+  if (name !== undefined && (typeof name !== 'string' || !name.trim())) return res.status(400).json({ error: 'name must not be empty' });
+  // 運営管理者が0人になると、誰も管理できなくなる
+  if (role && role !== 'admin' && target.role === 'admin' && adminCount() <= 1) {
+    return res.status(400).json({ error: '運営管理者が最後の1人のため、役割を変更できません' });
+  }
+  db.prepare('UPDATE admin_users SET name = COALESCE(?, name), role = COALESCE(?, role) WHERE id = ?').run(
+    name === undefined ? null : name.trim(),
+    role ?? null,
+    target.id
+  );
+  res.json({ ok: true });
+});
+
+router.post('/staff/:id/reset-password', requireAdmin, (req, res) => {
+  const target = db.prepare('SELECT id FROM admin_users WHERE id = ?').get(req.params.id);
+  if (!target) return res.status(404).json({ error: 'not_found' });
+  const invalid = validateNewPassword(req.body?.password);
+  if (invalid) return res.status(400).json({ error: invalid });
+  db.prepare('UPDATE admin_users SET password_hash = ?, must_change_password = 1 WHERE id = ?').run(bcrypt.hashSync(req.body.password, 10), target.id);
+  res.json({ ok: true });
+});
+
+router.delete('/staff/:id', requireAdmin, (req, res) => {
+  const target = db.prepare('SELECT * FROM admin_users WHERE id = ?').get(req.params.id);
+  if (!target) return res.status(404).json({ error: 'not_found' });
+  if (target.id === req.admin.id) return res.status(400).json({ error: '自分自身は削除できません' });
+  if (target.role === 'admin' && adminCount() <= 1) return res.status(400).json({ error: '運営管理者が最後の1人のため削除できません' });
+  db.prepare('DELETE FROM admin_users WHERE id = ?').run(target.id);
+  res.json({ ok: true });
+});
 
 // ---- overview ----
 router.get('/overview', (req, res) => {
@@ -168,7 +295,7 @@ router.patch('/students/:id', (req, res) => {
 
 // CSV一括登録: [{ name, email?, phone?, groupId? }, ...] を受け取り、1件ずつ挿入する
 // （メール重複は行単位でスキップし、どの行が失敗したかをresultsで返す）
-router.post('/students/bulk', (req, res) => {
+router.post('/students/bulk', requireAdmin, (req, res) => {
   const { rows } = req.body || {};
   if (!Array.isArray(rows) || rows.length === 0) return res.status(400).json({ error: 'rows is required' });
 
@@ -191,7 +318,7 @@ router.post('/students/bulk', (req, res) => {
 });
 
 // 複数生徒のステータス一括変更
-router.post('/students/bulk-status', (req, res) => {
+router.post('/students/bulk-status', requireAdmin, (req, res) => {
   const { ids, status } = req.body || {};
   if (!Array.isArray(ids) || ids.length === 0 || !['active', 'inactive'].includes(status)) {
     return res.status(400).json({ error: 'ids and a valid status (active/inactive) are required' });
@@ -314,7 +441,7 @@ router.patch('/groups/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-router.delete('/groups/:id', (req, res) => {
+router.delete('/groups/:id', requireAdmin, (req, res) => {
   db.prepare('UPDATE students SET group_id = NULL WHERE group_id = ?').run(req.params.id);
   db.prepare('DELETE FROM groups WHERE id = ?').run(req.params.id);
   res.json({ ok: true });
@@ -365,14 +492,14 @@ router.get('/coaches', (req, res) => {
   res.json(db.prepare('SELECT * FROM coaches ORDER BY id').all());
 });
 
-router.post('/coaches', (req, res) => {
+router.post('/coaches', requireAdmin, (req, res) => {
   const { name, email = '', specialty = '' } = req.body || {};
   if (!name) return res.status(400).json({ error: 'name is required' });
   const info = db.prepare('INSERT INTO coaches (name, email, specialty) VALUES (?, ?, ?)').run(name, email, specialty);
   res.json({ id: info.lastInsertRowid });
 });
 
-router.patch('/coaches/:id', (req, res) => {
+router.patch('/coaches/:id', requireAdmin, (req, res) => {
   const { name, email, specialty } = req.body || {};
   db.prepare('UPDATE coaches SET name = COALESCE(?, name), email = COALESCE(?, email), specialty = COALESCE(?, specialty) WHERE id = ?').run(
     name ?? null,
@@ -383,7 +510,7 @@ router.patch('/coaches/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-router.delete('/coaches/:id', (req, res) => {
+router.delete('/coaches/:id', requireAdmin, (req, res) => {
   db.prepare('DELETE FROM coaches WHERE id = ?').run(req.params.id);
   res.json({ ok: true });
 });
@@ -393,14 +520,14 @@ router.get('/materials', (req, res) => {
   res.json(db.prepare('SELECT * FROM materials ORDER BY id DESC').all());
 });
 
-router.post('/materials', (req, res) => {
+router.post('/materials', requireAdmin, (req, res) => {
   const { title, week, status = 'draft' } = req.body || {};
   if (!title) return res.status(400).json({ error: 'title is required' });
   const info = db.prepare('INSERT INTO materials (title, week, status) VALUES (?, ?, ?)').run(title, week, status);
   res.json({ id: info.lastInsertRowid });
 });
 
-router.patch('/materials/:id', (req, res) => {
+router.patch('/materials/:id', requireAdmin, (req, res) => {
   const { status, title, week } = req.body || {};
   db.prepare('UPDATE materials SET status = COALESCE(?, status), title = COALESCE(?, title), week = COALESCE(?, week) WHERE id = ?').run(
     status ?? null,
@@ -433,14 +560,14 @@ router.get('/phrase-decks', (req, res) => {
   );
 });
 
-router.post('/phrase-decks', (req, res) => {
+router.post('/phrase-decks', requireAdmin, (req, res) => {
   const d = parseDeck(req.body || {});
   if (d.error) return res.status(400).json({ error: d.error });
   const info = db.prepare('INSERT INTO phrase_decks (kind, name, level, attr, attr_value, content_type) VALUES (?, ?, ?, ?, ?, ?)').run(d.kind, d.name, d.level, d.attr, d.attr_value, d.contentType);
   res.json({ id: info.lastInsertRowid });
 });
 
-router.patch('/phrase-decks/:id', (req, res) => {
+router.patch('/phrase-decks/:id', requireAdmin, (req, res) => {
   const d = parseDeck(req.body || {});
   if (d.error) return res.status(400).json({ error: d.error });
   if (!db.prepare("SELECT id FROM phrase_decks WHERE id = ? AND kind = 'official'").get(req.params.id)) return res.status(404).json({ error: 'not_found' });
@@ -448,7 +575,7 @@ router.patch('/phrase-decks/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-router.delete('/phrase-decks/:id', (req, res) => {
+router.delete('/phrase-decks/:id', requireAdmin, (req, res) => {
   removeDeck(req.params.id);
   res.json({ ok: true });
 });
@@ -458,7 +585,7 @@ router.get('/phrase-decks/:id/items', (req, res) => {
 });
 
 // 項目を丸ごと置き換える。同じ英文は既存の項目を引き継ぐ（生徒の「覚えた」状態を保つため）
-router.put('/phrase-decks/:id/items', (req, res) => {
+router.put('/phrase-decks/:id/items', requireAdmin, (req, res) => {
   if (!db.prepare("SELECT id FROM phrase_decks WHERE id = ? AND kind = 'official'").get(req.params.id)) return res.status(404).json({ error: 'not_found' });
   const items = Array.isArray(req.body?.items) ? req.body.items : [];
   if (items.length > 2000) return res.status(400).json({ error: 'too many items (max 2000)' });
@@ -504,7 +631,7 @@ router.get('/announcements', (req, res) => {
   );
 });
 
-router.post('/announcements', (req, res) => {
+router.post('/announcements', requireAdmin, (req, res) => {
   const { title, body, target = '全生徒', targetGroupId = null, status = 'draft' } = req.body || {};
   if (!title) return res.status(400).json({ error: 'title is required' });
   if (!['全生徒', '特定グループ'].includes(target)) return res.status(400).json({ error: 'invalid target' });
@@ -515,7 +642,7 @@ router.post('/announcements', (req, res) => {
   res.json({ id: info.lastInsertRowid });
 });
 
-router.patch('/announcements/:id', (req, res) => {
+router.patch('/announcements/:id', requireAdmin, (req, res) => {
   const body = req.body || {};
   const { status, title } = body;
   db.prepare(
@@ -560,7 +687,7 @@ router.get('/lectures', (req, res) => {
   res.json(db.prepare('SELECT * FROM lectures ORDER BY sort_order, id').all());
 });
 
-router.post('/lectures', (req, res) => {
+router.post('/lectures', requireAdmin, (req, res) => {
   const { youtubeId, title, instructor = '', category = '', sortOrder = 0 } = req.body || {};
   if (!youtubeId || !title) return res.status(400).json({ error: 'youtubeId and title are required' });
   if (!YOUTUBE_ID_PATTERN.test(extractYoutubeId(youtubeId))) return res.status(400).json({ error: 'YouTubeの動画URLまたはIDを正しく入力してください' });
@@ -570,7 +697,7 @@ router.post('/lectures', (req, res) => {
   res.json({ id: info.lastInsertRowid });
 });
 
-router.patch('/lectures/:id', (req, res) => {
+router.patch('/lectures/:id', requireAdmin, (req, res) => {
   const { youtubeId, title, instructor, category, sortOrder } = req.body || {};
   if (youtubeId && !YOUTUBE_ID_PATTERN.test(extractYoutubeId(youtubeId))) {
     return res.status(400).json({ error: 'YouTubeの動画URLまたはIDを正しく入力してください' });
@@ -591,7 +718,7 @@ router.patch('/lectures/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-router.delete('/lectures/:id', (req, res) => {
+router.delete('/lectures/:id', requireAdmin, (req, res) => {
   db.prepare('DELETE FROM lectures WHERE id = ?').run(req.params.id);
   res.json({ ok: true });
 });
@@ -602,7 +729,7 @@ router.get('/ads', (req, res) => {
 });
 
 // バナー画像のアップロード。返ってきたurlをimageUrlとしてPOST/PATCH /adsに渡す
-router.post('/ads/upload', adImageUpload.single('image'), (req, res) => {
+router.post('/ads/upload', requireAdmin, adImageUpload.single('image'), (req, res) => {
   const file = req.file;
   if (!file) return res.status(400).json({ error: 'image file is required' });
   try {
@@ -625,7 +752,7 @@ router.post('/ads/upload', adImageUpload.single('image'), (req, res) => {
   }
 });
 
-router.post('/ads', (req, res) => {
+router.post('/ads', requireAdmin, (req, res) => {
   const { imageUrl, linkUrl = '', placement = 'home', enabled = true, sortOrder = 0 } = req.body || {};
   if (!imageUrl) return res.status(400).json({ error: 'imageUrl is required' });
   if (linkUrl && !/^https?:\/\//i.test(linkUrl)) return res.status(400).json({ error: 'linkUrl must be http(s)' });
@@ -635,7 +762,7 @@ router.post('/ads', (req, res) => {
   res.json({ id: info.lastInsertRowid });
 });
 
-router.patch('/ads/:id', (req, res) => {
+router.patch('/ads/:id', requireAdmin, (req, res) => {
   const { imageUrl, linkUrl, placement, enabled, sortOrder } = req.body || {};
   if (linkUrl && !/^https?:\/\//i.test(linkUrl)) return res.status(400).json({ error: 'linkUrl must be http(s)' });
   db.prepare(
@@ -654,7 +781,7 @@ router.patch('/ads/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-router.delete('/ads/:id', (req, res) => {
+router.delete('/ads/:id', requireAdmin, (req, res) => {
   db.prepare('DELETE FROM ad_banners WHERE id = ?').run(req.params.id);
   res.json({ ok: true });
 });

@@ -4,6 +4,7 @@ import { api } from '../api/client';
 import { Avatar } from '../components/Avatar';
 import { Modal } from '../components/Modal';
 import { Pagination } from '../components/Pagination';
+import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { usePagination } from '../hooks/usePagination';
 
@@ -43,6 +44,7 @@ function parseCsv(text: string): BulkRow[] {
 
 export default function Students() {
   const toast = useToast();
+  const isAdmin = useAuth().user?.role === 'admin'; // CSV一括登録・一括ステータス変更は運営管理者のみ
   const [students, setStudents] = useState<Student[]>([]);
   const { page, setPage, totalPages, pageItems, total } = usePagination(students);
   const [groups, setGroups] = useState<Group[]>([]);
@@ -171,15 +173,17 @@ export default function Students() {
           <option value="active">有効</option>
           <option value="inactive">無効</option>
         </select>
-        <button className="btn" style={{ marginLeft: 'auto' }} onClick={() => setShowBulkImport(true)}>
-          CSV一括登録
-        </button>
-        <button className="btn btn-primary" onClick={() => setShowAdd(true)}>
+        {isAdmin && (
+          <button className="btn" style={{ marginLeft: 'auto' }} onClick={() => setShowBulkImport(true)}>
+            CSV一括登録
+          </button>
+        )}
+        <button className="btn btn-primary" style={isAdmin ? undefined : { marginLeft: 'auto' }} onClick={() => setShowAdd(true)}>
           ＋ 生徒を追加
         </button>
       </div>
 
-      {selected.size > 0 && (
+      {isAdmin && selected.size > 0 && (
         <div className="filter-row" style={{ background: 'rgba(232,130,95,0.08)', borderRadius: 8, padding: '8px 12px' }}>
           <span style={{ fontSize: 13, fontWeight: 600 }}>{selected.size}件選択中</span>
           <button className="btn" onClick={() => bulkSetStatus('active')}>
@@ -198,7 +202,7 @@ export default function Students() {
         <thead>
           <tr>
             <th style={{ width: 32 }}>
-              <input type="checkbox" checked={allPageSelected} onChange={toggleSelectPage} />
+              {isAdmin && <input type="checkbox" checked={allPageSelected} onChange={toggleSelectPage} />}
             </th>
             <th>氏名</th>
             <th>グループ</th>
@@ -215,7 +219,7 @@ export default function Students() {
             return (
               <tr key={s.id}>
                 <td>
-                  <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggleSelectOne(s.id)} />
+                  {isAdmin && <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggleSelectOne(s.id)} />}
                 </td>
                 <td>
                   <Link

@@ -13,7 +13,8 @@ CREATE TABLE IF NOT EXISTS admin_users (
   email TEXT UNIQUE NOT NULL,
   password_hash TEXT NOT NULL,
   role TEXT NOT NULL DEFAULT 'coach',
-  notify_email INTEGER NOT NULL DEFAULT 1
+  notify_email INTEGER NOT NULL DEFAULT 1,
+  must_change_password INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS groups (
@@ -226,6 +227,10 @@ CREATE TABLE IF NOT EXISTS ad_banners (
 `);
 
 // 既存DB（作成済みのadmin.sqlite）に新カラムを後付けするマイグレーション
+const adminUserCols = db.prepare('PRAGMA table_info(admin_users)').all().map((c) => c.name);
+if (!adminUserCols.includes('must_change_password')) {
+  db.exec('ALTER TABLE admin_users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0');
+}
 const studentCols = db.prepare('PRAGMA table_info(students)').all().map((c) => c.name);
 if (!studentCols.includes('onboarding_step')) {
   db.exec("ALTER TABLE students ADD COLUMN onboarding_step TEXT NOT NULL DEFAULT 'ob1'");
@@ -297,7 +302,12 @@ function addDaysStr(days) {
   return d.toISOString().slice(0, 10);
 }
 
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+const KNOWN_DEFAULT_PASSWORD = 'teppen2026';
+
+// 開発用のモックデータ（生徒25人・記録など）。本番では投入しない（SEED_MOCK_DATA=1 で明示した場合のみ）
 function seedIfEmpty() {
+  if (IS_PRODUCTION && process.env.SEED_MOCK_DATA !== '1') return;
   const studentCount = db.prepare('SELECT COUNT(*) as c FROM students').get().c;
   if (studentCount > 0) return;
 
@@ -399,9 +409,6 @@ function seedIfEmpty() {
     addDaysStr(0)
   );
 
-  const insertAdmin = db.prepare('INSERT INTO admin_users (name, email, password_hash, role, notify_email) VALUES (?, ?, ?, ?, ?)');
-  insertAdmin.run('田中コーチ', 'coach@teppen-english.com', bcrypt.hashSync('teppen2026', 10), 'admin', 1);
-
   const insertLecture = db.prepare(
     'INSERT INTO lectures (youtube_id, title, instructor, category, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?)'
   );
@@ -428,6 +435,45 @@ function seedIfEmpty() {
   console.log('Seed complete.');
 }
 
+// 管理者アカウントが1件も無いときだけ、最初の運営管理者を作る。
+// 本番: ADMIN_EMAIL と ADMIN_INITIAL_PASSWORD（10文字以上）が必須で、初回ログイン後にパスワード変更を強制する。
+// 開発: 未指定なら開発用の既定アカウントを作る（ソースに載っているため本番では使わない）
+function ensureAdminUser() {
+  if (db.prepare('SELECT COUNT(*) as c FROM admin_users').get().c > 0) return;
+  const email = process.env.ADMIN_EMAIL;
+  const password = process.env.ADMIN_INITIAL_PASSWORD;
+  if (IS_PRODUCTION) {
+    if (!email || !password || password.length < 10) {
+      throw new Error('本番では ADMIN_EMAIL と ADMIN_INITIAL_PASSWORD（10文字以上）を設定してください');
+    }
+    db.prepare('INSERT INTO admin_users (name, email, password_hash, role, notify_email, must_change_password) VALUES (?, ?, ?, ?, 1, 1)').run(
+      '運営管理者', email.trim().toLowerCase(), bcrypt.hashSync(password, 10), 'admin'
+    );
+    console.log(`Admin user created: ${email} (初回ログイン後にパスワード変更が必要です)`);
+    return;
+  }
+  const devEmail = (email || 'coach@teppen-english.com').trim().toLowerCase();
+  db.prepare('INSERT INTO admin_users (name, email, password_hash, role, notify_email, must_change_password) VALUES (?, ?, ?, ?, 1, 0)').run(
+    '田中コーチ', devEmail, bcrypt.hashSync(password || KNOWN_DEFAULT_PASSWORD, 10), 'admin'
+  );
+  console.warn(`[dev] Admin user created: ${devEmail}（開発用の既定パスワード。本番では使わないこと）`);
+}
+
+// 本番で、ソースに載っている既定パスワードのままのアカウントがあれば、パスワード変更を強制する
+function flagKnownDefaultPasswords() {
+  if (!IS_PRODUCTION) return;
+  db.prepare('SELECT id, email, password_hash FROM admin_users WHERE must_change_password = 0')
+    .all()
+    .forEach((u) => {
+      if (bcrypt.compareSync(KNOWN_DEFAULT_PASSWORD, u.password_hash)) {
+        db.prepare('UPDATE admin_users SET must_change_password = 1 WHERE id = ?').run(u.id);
+        console.warn(`Admin ${u.email} は既定パスワードのままです。次回ログイン時に変更を強制します`);
+      }
+    });
+}
+
 seedIfEmpty();
+ensureAdminUser();
+flagKnownDefaultPasswords();
 
 module.exports = db;

@@ -27,6 +27,13 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
+    // 初期パスワードのままのアカウントは、パスワードを変更するまで他の操作ができない
+    if (res.status === 403 && body.error === 'password_change_required') {
+      window.location.hash = '#/settings';
+      throw new Error('初期パスワードを変更してください');
+    }
+    if (res.status === 403 && body.error === 'forbidden') throw new Error('この操作は運営管理者のみ行えます');
+    if (res.status === 429) throw new Error('試行回数が多すぎます。しばらく待ってからお試しください');
     throw new Error(body.error || `request failed (${res.status})`);
   }
   return res.json();

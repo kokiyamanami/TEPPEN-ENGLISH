@@ -1,4 +1,4 @@
-import { Navigate, Route, HashRouter, Routes } from 'react-router-dom';
+import { Navigate, Route, HashRouter, Routes, useLocation } from 'react-router-dom';
 import { Sidebar } from './components/Sidebar';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
@@ -13,6 +13,7 @@ import Materials from './pages/Materials';
 import PhraseDecks from './pages/PhraseDecks';
 import Overview from './pages/Overview';
 import Settings from './pages/Settings';
+import Staff from './pages/Staff';
 import StudentDetail from './pages/StudentDetail';
 import Students from './pages/Students';
 
@@ -25,10 +26,15 @@ function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
-function RequireAuth({ children }: { children: React.ReactNode }) {
+// adminOnly: 運営管理者のみ開けるページ（コーチはダッシュボードへ戻す）
+function RequireAuth({ children, adminOnly = false }: { children: React.ReactNode; adminOnly?: boolean }) {
   const { user, loading } = useAuth();
+  const location = useLocation();
   if (loading) return <div className="loading-wrap">読み込み中…</div>;
   if (!user) return <Navigate to="/login" replace />;
+  // 初期パスワードのままのアカウントは、設定画面でパスワードを変更するまで他のページを開けない
+  if (user.mustChangePassword && location.pathname !== '/settings') return <Navigate to="/settings" replace />;
+  if (adminOnly && user.role !== 'admin') return <Navigate to="/overview" replace />;
   return <Shell>{children}</Shell>;
 }
 
@@ -82,7 +88,7 @@ export default function App() {
             <Route
               path="/coaches"
               element={
-                <RequireAuth>
+                <RequireAuth adminOnly>
                   <Coaches />
                 </RequireAuth>
               }
@@ -90,7 +96,7 @@ export default function App() {
             <Route
               path="/phrase-decks"
               element={
-                <RequireAuth>
+                <RequireAuth adminOnly>
                   <PhraseDecks />
                 </RequireAuth>
               }
@@ -98,7 +104,7 @@ export default function App() {
             <Route
               path="/materials"
               element={
-                <RequireAuth>
+                <RequireAuth adminOnly>
                   <Materials />
                 </RequireAuth>
               }
@@ -106,7 +112,7 @@ export default function App() {
             <Route
               path="/announcements"
               element={
-                <RequireAuth>
+                <RequireAuth adminOnly>
                   <Announcements />
                 </RequireAuth>
               }
@@ -114,7 +120,7 @@ export default function App() {
             <Route
               path="/lectures"
               element={
-                <RequireAuth>
+                <RequireAuth adminOnly>
                   <Lectures />
                 </RequireAuth>
               }
@@ -122,7 +128,7 @@ export default function App() {
             <Route
               path="/ads"
               element={
-                <RequireAuth>
+                <RequireAuth adminOnly>
                   <AdBanners />
                 </RequireAuth>
               }
@@ -132,6 +138,14 @@ export default function App() {
               element={
                 <RequireAuth>
                   <Settings />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/staff"
+              element={
+                <RequireAuth adminOnly>
+                  <Staff />
                 </RequireAuth>
               }
             />

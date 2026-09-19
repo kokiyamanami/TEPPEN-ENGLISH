@@ -2,12 +2,14 @@ import { FormEvent, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { Modal } from '../components/Modal';
+import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 
 type Group = { id: number; name: string; status: string; studentCount: number };
 
 export default function Groups() {
   const toast = useToast();
+  const isAdmin = useAuth().user?.role === 'admin'; // グループの削除は運営管理者のみ
   const [tab, setTab] = useState<'active' | 'inactive'>('active');
   const [groups, setGroups] = useState<Group[]>([]);
   const [showCreate, setShowCreate] = useState(false);
@@ -74,9 +76,11 @@ export default function Groups() {
               <button className="btn" style={{ flex: 1 }} onClick={() => toggleActive(g)}>
                 {g.status === 'active' ? '非アクティブ化' : '再アクティブ化'}
               </button>
-              <button className="btn btn-danger" onClick={() => setDeleteTarget(g)}>
-                削除
-              </button>
+              {isAdmin && (
+                <button className="btn btn-danger" onClick={() => setDeleteTarget(g)}>
+                  削除
+                </button>
+              )}
             </div>
           </div>
         ))}

@@ -1,7 +1,7 @@
 import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { api } from '../api/client';
 
-type AdminUser = { id: number; name: string; email: string; role: string; notifyEmail: boolean };
+type AdminUser = { id: number; name: string; email: string; role: string; notifyEmail: boolean; mustChangePassword: boolean };
 
 type AuthContextValue = {
   user: AdminUser | null;

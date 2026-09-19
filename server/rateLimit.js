@@ -1,10 +1,11 @@
 // 生徒ごとの簡易レート制限（メモリ上・単一プロセス前提）。
 // OpenAI課金が発生するエンドポイントの連打・濫用対策。requireAuthの後ろに置くこと
-function createRateLimiter({ windowMs = 60 * 1000, max = 30 } = {}) {
+// keyFn を渡すと、生徒ID以外（例: IP+メールアドレス）をキーにできる（ログインの総当たり対策など）
+function createRateLimiter({ windowMs = 60 * 1000, max = 30, keyFn } = {}) {
   const hits = new Map(); // key -> 直近windowMs内のリクエスト時刻
 
   return function rateLimit(req, res, next) {
-    const key = String(req.studentId ?? req.ip);
+    const key = String(keyFn ? keyFn(req) : req.studentId ?? req.ip);
     const now = Date.now();
     const recent = (hits.get(key) || []).filter((t) => now - t < windowMs);
     if (recent.length >= max) {

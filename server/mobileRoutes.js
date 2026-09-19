@@ -10,6 +10,10 @@ const { todayStr, mondayOfStr, clientToday } = require('./dateUtil');
 const { createRateLimiter } = require('./rateLimit');
 
 const aiLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 30 });
+// 総当たり・大量登録対策（ログインは同じIP×メールアドレスで15分に10回、新規登録は同じIPで15分に20回まで）
+const emailOf = (req) => String(req.body?.email || '').trim().toLowerCase();
+const loginLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 10, keyFn: (req) => `${req.ip}|${emailOf(req)}` });
+const signupLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 20, keyFn: (req) => req.ip });
 const { lookupDictionary } = require('./dictionary');
 const { syncDecks } = require('./phraseDecks');
 const { generateCurated, isGenerating } = require('./curated');
@@ -43,7 +47,7 @@ function requireAuth(req, res, next) {
 }
 
 // ---- auth ----
-router.post('/signup', (req, res) => {
+router.post('/signup', signupLimiter, (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'email and password are required' });
   if (typeof email !== 'string' || typeof password !== 'string') return res.status(400).json({ error: 'invalid input' });
@@ -77,7 +81,7 @@ router.post('/signup', (req, res) => {
   res.json({ token, studentId });
 });
 
-router.post('/login', (req, res) => {
+router.post('/login', loginLimiter, (req, res) => {
   const { email, password } = req.body || {};
   if (typeof email !== 'string') return res.status(401).json({ error: 'メールアドレスまたはパスワードが正しくありません' });
   const student = db.prepare('SELECT * FROM students WHERE lower(email) = ?').get(email.trim().toLowerCase());

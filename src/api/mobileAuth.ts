@@ -26,6 +26,7 @@ export async function signup(email: string, password: string): Promise<string> {
     body: JSON.stringify({ email, password }),
   });
   const data = await res.json();
+  if (res.status === 429) throw new Error('試行回数が多すぎます。しばらく待ってからお試しください');
   if (!res.ok) throw new Error(data.error || 'サインアップに失敗しました');
   await storeToken(data.token);
   return data.token;
@@ -38,6 +39,7 @@ export async function login(email: string, password: string): Promise<string> {
     body: JSON.stringify({ email, password }),
   });
   const data = await res.json();
+  if (res.status === 429) throw new Error('試行回数が多すぎます。しばらく待ってからお試しください');
   if (!res.ok) throw new Error(data.error || 'ログインに失敗しました');
   await storeToken(data.token);
   return data.token;
