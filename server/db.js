@@ -477,3 +477,50 @@ ensureAdminUser();
 flagKnownDefaultPasswords();
 
 module.exports = db;
+// スキーマの変更履歴。今後の変更は、ここに version を1つ増やして追加する
+// （PRAGMA user_version で適用済みの版を管理し、未適用のものだけを順に実行する）。
+// 上にある既存の「カラムが無ければALTER」は、この仕組みを入れる前の変更で、そのまま残している
+const MIGRATIONS = [
+  {
+    version: 1,
+    // 検索条件の student_id 等にインデックスが無く、生徒・記録が増えると全件走査で遅くなっていたため追加
+    up: () =>
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_students_group ON students(group_id);
+        CREATE INDEX IF NOT EXISTS idx_students_email_lower ON students(lower(email));
+        CREATE INDEX IF NOT EXISTS idx_speaking_stats_student_date ON speaking_stats(student_id, date);
+        CREATE INDEX IF NOT EXISTS idx_speaking_stats_date ON speaking_stats(date);
+        CREATE INDEX IF NOT EXISTS idx_phrases_student_folder ON phrases(student_id, folder_id);
+        CREATE INDEX IF NOT EXISTS idx_phrases_folder ON phrases(folder_id);
+        CREATE INDEX IF NOT EXISTS idx_phrases_deck_item ON phrases(deck_item_id);
+        CREATE INDEX IF NOT EXISTS idx_phrase_folders_student ON phrase_folders(student_id, source);
+        CREATE INDEX IF NOT EXISTS idx_phrase_folders_deck ON phrase_folders(deck_id);
+        CREATE INDEX IF NOT EXISTS idx_phrase_deck_items_deck ON phrase_deck_items(deck_id);
+        CREATE INDEX IF NOT EXISTS idx_phrase_history_student ON phrase_history(student_id);
+        CREATE INDEX IF NOT EXISTS idx_daily_results ON daily_mission_results(student_id, date, type);
+        CREATE INDEX IF NOT EXISTS idx_weekly_results ON weekly_mission_results(student_id, week_start);
+        CREATE INDEX IF NOT EXISTS idx_monthly_results ON monthly_mission_results(student_id, month);
+        CREATE INDEX IF NOT EXISTS idx_weekly_progress ON weekly_progress(student_id, week_start);
+        CREATE INDEX IF NOT EXISTS idx_chat_student ON chat_messages(student_id);
+        CREATE INDEX IF NOT EXISTS idx_goal_history ON goal_history(student_id, effective_from);
+        CREATE INDEX IF NOT EXISTS idx_phase_history_student ON phase_history(student_id);
+        CREATE INDEX IF NOT EXISTS idx_unit_submissions_student ON unit_submissions(student_id);
+        CREATE INDEX IF NOT EXISTS idx_group_goals_group ON group_goals(group_id);
+      `),
+  },
+];
+
+function migrate() {
+  const current = db.pragma('user_version', { simple: true });
+  MIGRATIONS.filter((m) => m.version > current)
+    .sort((a, b) => a.version - b.version)
+    .forEach((m) => {
+      db.transaction(() => {
+        m.up();
+        db.pragma(`user_version = ${m.version}`);
+      })();
+      console.log(`DB migration applied: v${m.version}`);
+    });
+}
+
+migrate();

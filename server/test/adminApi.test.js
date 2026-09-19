@@ -66,6 +66,26 @@ async function createStaff(admin, { email, role }) {
   return { id: created.body.id, token: first.body.token };
 }
 
+test('生徒一覧: 週の発話時間・Monthly履歴・目標が、まとめて集計されて返る（N+1の書き換えの回帰テスト）', async () => {
+  const admin = await adminToken();
+  const list = (await call('GET', '/students', { token: admin })).body;
+  assert.ok(list.length >= 25);
+  for (const s of list) {
+    assert.strictEqual(typeof s.weeklySpeakMin, 'number');
+    assert.ok(Array.isArray(s.monthlyMissions));
+    assert.strictEqual(s.studyGoal, 90, '目標が未設定なら既定値');
+  }
+  const withMonthly = list.find((s) => s.monthlyMissions.length > 0);
+  assert.ok(withMonthly, 'シードデータではMonthlyの履歴がある');
+  const months = withMonthly.monthlyMissions.map((m) => m.month);
+  assert.deepStrictEqual(months, [...months].sort().reverse(), '新しい月が先頭');
+
+  // 目標を設定した生徒には、その目標が反映される
+  db.prepare('INSERT INTO goal_history (student_id, effective_from, study_goal, speak_goal) VALUES (?, ?, ?, ?)').run(withMonthly.id, '2026-01-01', 45, 15);
+  const after = (await call('GET', '/students', { token: admin })).body.find((s) => s.id === withMonthly.id);
+  assert.deepStrictEqual([after.studyGoal, after.speakGoal], [45, 15]);
+});
+
 test('認証: トークンなしは401、削除されたアカウントのトークンは無効になる', async () => {
   assert.strictEqual((await call('GET', '/students')).status, 401);
   const admin = await adminToken();

@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BACKEND_URL } from '../config/api';
+import { fetchWithTimeout, TIMEOUT_MS } from './http';
 
 const TOKEN_KEY = 'teppen_token';
 
@@ -20,7 +21,7 @@ export async function clearToken() {
 }
 
 export async function signup(email: string, password: string): Promise<string> {
-  const res = await fetch(`${BACKEND_URL}/api/mobile/signup`, {
+  const res = await fetchWithTimeout(`${BACKEND_URL}/api/mobile/signup`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
@@ -33,7 +34,7 @@ export async function signup(email: string, password: string): Promise<string> {
 }
 
 export async function login(email: string, password: string): Promise<string> {
-  const res = await fetch(`${BACKEND_URL}/api/mobile/login`, {
+  const res = await fetchWithTimeout(`${BACKEND_URL}/api/mobile/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
@@ -47,7 +48,7 @@ export async function login(email: string, password: string): Promise<string> {
 
 export async function authedFetch(path: string, options: RequestInit = {}) {
   const token = await getStoredToken();
-  const res = await fetch(`${BACKEND_URL}/api/mobile${path}`, {
+  const res = await fetchWithTimeout(`${BACKEND_URL}/api/mobile${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -125,11 +126,15 @@ export async function uploadAvatar(uri: string, mimeType?: string | null, fileNa
   } as unknown as Blob);
 
   // Content-Typeは指定しない: fetchがFormDataから正しいmultipart境界を自動付与する
-  const res = await fetch(`${BACKEND_URL}/api/mobile/avatar`, {
-    method: 'POST',
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-    body: formData,
-  });
+  const res = await fetchWithTimeout(
+    `${BACKEND_URL}/api/mobile/avatar`,
+    {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      body: formData,
+    },
+    TIMEOUT_MS.upload
+  );
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     throw new Error(`avatar upload failed (${res.status}): ${text}`);

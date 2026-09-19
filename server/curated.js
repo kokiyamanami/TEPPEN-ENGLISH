@@ -1,7 +1,7 @@
-const OpenAI = require('openai');
 const db = require('./db');
+const { logger } = require('./logger');
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const openai = require('./openai');
 
 const CATEGORIES = [
   { name: '仕事で使う表現', type: 'phrase', fields: ['job', 'position', 'jobDetail', 'workChallenge'], guide: '仕事の場面（会議・メール・報告・交渉など）で、この人が実際に使いそうな表現' },
@@ -101,7 +101,7 @@ async function generateCuratedUnsafe(studentId, { more = false } = {}) {
     db.transaction(() => targets.forEach((c, i) => appendCategory(studentId, c.name, c.type, results[i])))();
     state.set(studentId, { lastRunAt: more ? Date.now() : st.lastRunAt });
   } catch (err) {
-    console.error('generateCurated failed:', err.message);
+    logger.error('generateCurated failed', err);
     // 失敗しても「新しく作る」の連打で毎回OpenAIを呼ばないよう、lastRunAtも更新してクールダウンさせる
     state.set(studentId, { failedAt: Date.now(), lastRunAt: more ? Date.now() : st.lastRunAt });
     return 'failed';
@@ -115,7 +115,7 @@ async function generateCurated(studentId, options) {
   try {
     return await generateCuratedUnsafe(studentId, options);
   } catch (err) {
-    console.error('generateCurated error:', err.message);
+    logger.error('generateCurated error', err);
     state.set(studentId, { failedAt: Date.now(), lastRunAt: state.get(studentId)?.lastRunAt });
     return 'failed';
   }

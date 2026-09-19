@@ -1,4 +1,5 @@
 import { BACKEND_URL } from '../config/api';
+import { fetchWithTimeout, TIMEOUT_MS } from './http';
 import { authHeaders } from './mobileAuth';
 
 export type GradingResult = { transcript: string; pass: boolean; comment: string; recorded?: boolean };
@@ -25,11 +26,11 @@ export async function submitForGrading(
   if (mission) formData.append('mission', mission);
 
   // Content-Typeは指定しない: fetchがFormDataから正しいmultipart境界を自動付与する
-  const res = await fetch(`${BACKEND_URL}/api/grade`, {
+  const res = await fetchWithTimeout(`${BACKEND_URL}/api/grade`, {
     method: 'POST',
     headers: await authHeaders(),
     body: formData,
-  });
+  }, TIMEOUT_MS.grading);
 
   if (!res.ok) {
     const text = await res.text().catch(() => '');

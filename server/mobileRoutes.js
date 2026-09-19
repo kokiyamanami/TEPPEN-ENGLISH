@@ -4,8 +4,8 @@ const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
-const OpenAI = require('openai');
 const db = require('./db');
+const { logger } = require('./logger');
 const { todayStr, mondayOfStr, clientToday } = require('./dateUtil');
 const { createRateLimiter } = require('./rateLimit');
 
@@ -29,7 +29,7 @@ const AVATAR_DIR = path.join(__dirname, 'public', 'avatars');
 fs.mkdirSync(AVATAR_DIR, { recursive: true });
 const avatarUpload = multer({ dest: '/tmp/teppen-uploads/', limits: { fileSize: 10 * 1024 * 1024 } });
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const openai = require('./openai');
 
 const DEFAULT_MY_FOLDER = 'マイフレーズ';
 const DEFAULT_MY_WORD_FOLDER = 'マイ単語';
@@ -140,7 +140,7 @@ router.post('/avatar', avatarUpload.single('avatar'), (req, res) => {
     }
     res.json({ avatarUrl });
   } catch (err) {
-    console.error('avatar upload error:', err);
+    logger.error('avatar upload error', err, { id: req.id });
     fs.unlink(file.path, () => {});
     res.status(500).json({ error: 'avatar_upload_failed' });
   }
@@ -507,7 +507,7 @@ router.post('/chat-ai', aiLimiter, async (req, res) => {
     });
     res.json({ reply: resp.choices[0].message.content || '' });
   } catch (err) {
-    console.error('chat-ai error:', err);
+    logger.error('chat-ai error', err, { id: req.id });
     res.status(500).json({ error: 'chat_ai_failed' });
   }
 });
@@ -565,7 +565,7 @@ router.post('/word-lookup', async (req, res) => {
     wordLookupCache.set(cacheKey, result);
     res.json(result);
   } catch (err) {
-    console.error('word-lookup error:', err);
+    logger.error('word-lookup error', err, { id: req.id });
     res.status(500).json({ error: 'word_lookup_failed' });
   }
 });

@@ -5,6 +5,7 @@ const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
 const db = require('./db');
+const { logger } = require('./logger');
 const { todayStr } = require('./dateUtil');
 const { removeDeck, syncDecks } = require('./phraseDecks');
 const { goalHistory, restDays, currentGoal } = require('./goals');
@@ -246,14 +247,28 @@ router.get('/students', (req, res) => {
   const students = db.prepare(sql).all(...params);
 
   const withStats = students.map((s) => {
-    const speak = db
-      .prepare(`SELECT COALESCE(SUM(speak_min),0) t FROM speaking_stats WHERE student_id = ? AND date >= date('now','-7 day')`)
-      .get(s.id).t;
-    const monthly = db
-      .prepare(`SELECT month, pass, date FROM monthly_mission_results WHERE student_id = ? ORDER BY month DESC`)
-      .all(s.id);
-    const goal = currentGoal(goalHistory(s.id));
-    return { ...s, weeklySpeakMin: speak, monthlyMissions: monthly, studyGoal: goal.study, speakGoal: goal.speak };
+  // 生徒ごとにクエリを投げる（N+1）と、生徒数に比例して遅くなる（3000人で十数秒）ため、
+  // 集計・履歴を一括で取得して生徒に引き当てる
+  const speakByStudent = new Map(
+    db
+      .prepare(`SELECT student_id, COALESCE(SUM(speak_min),0) t FROM speaking_stats WHERE date >= date('now','-7 day') GROUP BY student_id`)
+      .all()
+      .map((r) => [r.student_id, r.t])
+  );
+  const monthlyByStudent = new Map();
+  db.prepare('SELECT student_id, month, pass, date FROM monthly_mission_results ORDER BY month DESC')
+    .all()
+    .forEach((r) => {
+      if (!monthlyByStudent.has(r.student_id)) monthlyByStudent.set(r.student_id, []);
+      monthlyByStudent.get(r.student_id).push({ month: r.month, pass: r.pass, date: r.date });
+    });
+  // 現在の目標 = 適用開始日が最も新しいもの（goals.js の currentGoal と同じ並び: effective_from, id の昇順の最後）
+  const goalByStudent = new Map();
+  db.prepare('SELECT student_id, study_goal, speak_goal FROM goal_history ORDER BY effective_from, id')
+    .all()
+    .forEach((r) => goalByStudent.set(r.student_id, { study: r.study_goal, speak: r.speak_goal }));
+    const goal = currentGoal(goalByStudent.has(s.id) ? [goalByStudent.get(s.id)] : []);
+    return { ...s, weeklySpeakMin: speakByStudent.get(s.id) ?? 0, monthlyMissions: monthlyByStudent.get(s.id) ?? [], studyGoal: goal.study, speakGoal: goal.speak };
   });
 
   res.json(withStats);
@@ -746,7 +761,7 @@ router.post('/ads/upload', requireAdmin, adImageUpload.single('image'), (req, re
     }
     res.json({ url: `/ads/${filename}` });
   } catch (err) {
-    console.error('ad image upload error:', err);
+    logger.error('ad image upload error', err, { id: req.id });
     fs.unlink(file.path, () => {});
     res.status(500).json({ error: 'upload_failed' });
   }

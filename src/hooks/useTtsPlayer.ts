@@ -1,5 +1,6 @@
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { useEffect, useRef, useState } from 'react';
+import { fetchWithTimeout, TIMEOUT_MS } from '../api/http';
 import { authHeaders } from '../api/mobileAuth';
 import { BACKEND_URL } from '../config/api';
 
@@ -27,11 +28,11 @@ export function useTtsPlayer(text: string, voice: TtsVoice = 'alloy') {
     setPreparing(true);
     setError(null);
     try {
-      const res = await fetch(`${BACKEND_URL}/api/tts/prepare`, {
+      const res = await fetchWithTimeout(`${BACKEND_URL}/api/tts/prepare`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         body: JSON.stringify({ text, voice }),
-      });
+      }, TIMEOUT_MS.tts);
       if (!res.ok) throw new Error(`tts prepare failed (${res.status})`);
       const data = await res.json();
       const fullUri = `${BACKEND_URL}${data.url}`;

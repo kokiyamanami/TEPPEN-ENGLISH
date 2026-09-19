@@ -1,20 +1,38 @@
 // EC2開発サーバーのURL。本番ではビルド時に VITE_BACKEND_URL で上書きする
 export const BACKEND_URL: string = import.meta.env.VITE_BACKEND_URL || 'http://35.72.165.240:4000';
 
+// 通信にタイムアウトを付ける（サーバーが詰まったときに、画面が固まり続けないように）
+async function fetchWithTimeout(input: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } catch (e) {
+    if ((e as Error).name === 'AbortError') throw new Error('通信がタイムアウトしました');
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function getToken() {
   return localStorage.getItem('admin_token');
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
-  const res = await fetch(`${BACKEND_URL}/api/admin${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
+  const res = await fetchWithTimeout(
+    `${BACKEND_URL}/api/admin${path}`,
+    {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...options.headers,
+      },
     },
-  });
+    30_000
+  );
   if (res.status === 401) {
     const body = await res.json().catch(() => ({}));
     // /loginへの401はログイン失敗の通常応答なので、セッション切れの強制リダイレクトはかけない
@@ -52,11 +70,15 @@ export async function uploadFile(path: string, field: string, file: File): Promi
   const token = getToken();
   const formData = new FormData();
   formData.append(field, file);
-  const res = await fetch(`${BACKEND_URL}/api/admin${path}`, {
-    method: 'POST',
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-    body: formData,
-  });
+  const res = await fetchWithTimeout(
+    `${BACKEND_URL}/api/admin${path}`,
+    {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      body: formData,
+    },
+    60_000
+  );
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error || `upload failed (${res.status})`);
